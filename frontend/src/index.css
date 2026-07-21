@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* ── Non-selectable text ── */
+* {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input, textarea, select, [contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ── Custom themed scrollbar ── */
+html, body, * {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+html:hover, body:hover, *:hover {
+  scrollbar-color: #475569 transparent;
+}
+
+html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+html::-webkit-scrollbar-track, body::-webkit-scrollbar-track, *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb, *::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+}
+
+html:hover::-webkit-scrollbar-thumb, body:hover::-webkit-scrollbar-thumb,
+*:hover::-webkit-scrollbar-thumb {
+  background: #64748b;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  html, body, * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  html:hover, body:hover, *:hover {
+    scrollbar-color: #475569 transparent;
+  }
+}
