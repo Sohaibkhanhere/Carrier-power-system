@@ -1,10 +1,8 @@
-"""Decision engine — capacity-based load balancing.
+"""Decision engine — capacity-based or threshold-based carrier management.
 
-For each tower, sum the predicted load across all carriers, then activate
-the minimum number of carriers (sorted by activation_order: A first, B
-second, C third) such that total_demand / active_count <= capacity_ceiling.
-
-Carrier at activation_order=0 is always ON (primary/anchor).
+Selects between two algorithms based on the 'decision_logic' config field:
+  - "capacity_based": activate minimum carriers so total_demand/n <= ceiling
+  - "threshold_based": if ANY carrier exceeds the threshold, activate all carriers
 """
 
 from __future__ import annotations
@@ -15,14 +13,16 @@ from sqlalchemy.orm import Session
 from app import models
 from app.services.prediction import predict_prb
 from app.services.power import (
-    get_power_config, compute_tower_power, capacity_decide,
+    get_power_config, compute_tower_power, capacity_decide, threshold_decide,
 )
 
 
 def make_decisions_for_hour(target_date: date, hour: int, db: Session) -> list[dict]:
-    """Evaluate all towers for a given date+hour using capacity-based logic."""
+    """Evaluate all towers for a given date+hour using the configured decision logic."""
     pconfig = get_power_config(db)
     ceiling = pconfig["capacity_ceiling"]
+    logic = pconfig.get("decision_logic", "capacity_based")
+    threshold = pconfig.get("carrier_threshold", 70.0)
     towers = db.query(models.Tower).all()
     results = []
 
@@ -40,8 +40,11 @@ def make_decisions_for_hour(target_date: date, hour: int, db: Session) -> list[d
                 "predicted_prb": pred["predicted_prb"],
             })
 
-        # Run capacity-based decision
-        decision_result = capacity_decide(carrier_loads, ceiling)
+        # Dispatch to the configured decision logic
+        if logic == "threshold_based":
+            decision_result = threshold_decide(carrier_loads, threshold)
+        else:
+            decision_result = capacity_decide(carrier_loads, ceiling)
 
         # Map carrier states back to B/C format for the decisions table
         carrier_states = {c["sector_label"]: c["is_on"] for c in decision_result["carriers"]}

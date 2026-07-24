@@ -408,12 +408,12 @@ def test_scenario(
     ceiling: float = Query(None, description="Override ceiling (uses current config if omitted)"),
     db: Session = Depends(get_db),
 ):
-    """Test scenario: given 3 hypothetical carrier loads and a ceiling,
-    show how many carriers the algorithm would activate."""
-    from app.services.power import capacity_decide
+    """Test scenario: given 3 hypothetical carrier loads,
+    show how many carriers the configured algorithm would activate."""
+    from app.services.power import capacity_decide, threshold_decide
 
     pconfig = power.get_power_config(db)
-    effective_ceiling = ceiling if ceiling is not None else pconfig["capacity_ceiling"]
+    logic = pconfig.get("decision_logic", "capacity_based")
 
     carrier_loads = [
         {"sector_label": "A", "activation_order": 0, "predicted_prb": load_a},
@@ -421,18 +421,19 @@ def test_scenario(
         {"sector_label": "C", "activation_order": 2, "predicted_prb": load_c},
     ]
 
-    result = capacity_decide(carrier_loads, effective_ceiling)
+    if logic == "threshold_based":
+        effective_threshold = pconfig.get("carrier_threshold", 70.0)
+        result = threshold_decide(carrier_loads, effective_threshold)
+        result["decision_logic"] = "threshold_based"
+        result["carrier_threshold"] = effective_threshold
+    else:
+        effective_ceiling = ceiling if ceiling is not None else pconfig["capacity_ceiling"]
+        result = capacity_decide(carrier_loads, effective_ceiling)
+        result["decision_logic"] = "capacity_based"
+        result["capacity_ceiling"] = effective_ceiling
 
-    return {
-        "loads": {"A": load_a, "B": load_b, "C": load_c},
-        "total_demand": result["total_demand"],
-        "capacity_ceiling": effective_ceiling,
-        "active_count": result["active_count"],
-        "max_carriers": result["max_carriers"],
-        "per_carrier_load": result["per_carrier_load"],
-        "mode": result["mode"],
-        "carriers": result["carriers"],
-    }
+    result["loads"] = {"A": load_a, "B": load_b, "C": load_c}
+    return result
 
 
 @router.get("/threshold")

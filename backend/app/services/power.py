@@ -23,6 +23,8 @@ DEFAULTS = {
     "capacity_ceiling": 80.0,
     "target_band_low": 70.0,
     "target_band_high": 80.0,
+    "decision_logic": "capacity_based",
+    "carrier_threshold": 70.0,
 }
 
 
@@ -41,6 +43,8 @@ def get_power_config(db: Session) -> dict:
         "capacity_ceiling": cfg.capacity_ceiling,
         "target_band_low": cfg.target_band_low,
         "target_band_high": cfg.target_band_high,
+        "decision_logic": cfg.decision_logic or "capacity_based",
+        "carrier_threshold": cfg.carrier_threshold or 70.0,
     }
 
 
@@ -52,7 +56,8 @@ def set_power_config(db: Session, params: dict) -> dict:
         db.add(cfg)
         db.flush()
     for key in ("carrier_a_watts", "carrier_b_watts", "carrier_c_watts", "load_scaling_factor",
-                "capacity_ceiling", "target_band_low", "target_band_high"):
+                "capacity_ceiling", "target_band_low", "target_band_high",
+                "decision_logic", "carrier_threshold"):
         if key in params:
             setattr(cfg, key, params[key])
     db.flush()
@@ -158,6 +163,50 @@ def capacity_decide(
     return {
         "total_demand": round(total_demand, 2),
         "capacity_ceiling": ceiling,
+        "active_count": active_count,
+        "max_carriers": len(carrier_loads),
+        "per_carrier_load": round(total_demand / active_count, 2) if active_count > 0 else 0,
+        "mode": mode,
+        "carriers": result_carriers,
+    }
+
+
+def threshold_decide(
+    carrier_loads: list[dict],
+    threshold: float,
+) -> dict:
+    """Threshold-based decision algorithm.
+
+    If ANY carrier's predicted_prb exceeds the threshold, ALL carriers are
+    activated. Otherwise only the primary carrier (activation_order=0) stays on.
+
+    Returns dict with carrier states, total_demand, active_count, mode.
+    """
+    total_demand = sum(c.get("predicted_prb", 0) or 0 for c in carrier_loads)
+
+    any_above = any((c.get("predicted_prb", 0) or 0) > threshold for c in carrier_loads)
+    active_count = len(carrier_loads) if any_above else 1
+
+    result_carriers = []
+    for c in carrier_loads:
+        is_on = c["activation_order"] < active_count
+        result_carriers.append({
+            "sector_label": c["sector_label"],
+            "activation_order": c["activation_order"],
+            "predicted_prb": c.get("predicted_prb"),
+            "is_on": is_on,
+        })
+
+    if active_count >= len(carrier_loads):
+        mode = "high"
+    elif active_count == 1:
+        mode = "power_saving"
+    else:
+        mode = "balanced"
+
+    return {
+        "total_demand": round(total_demand, 2),
+        "carrier_threshold": threshold,
         "active_count": active_count,
         "max_carriers": len(carrier_loads),
         "per_carrier_load": round(total_demand / active_count, 2) if active_count > 0 else 0,

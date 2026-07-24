@@ -73,6 +73,14 @@ def init_db():
             conn.execute(text("ALTER TABLE power_model_config ADD COLUMN target_band_high FLOAT DEFAULT 80.0"))
             conn.commit()
 
+        # v4 migration: decision logic selector
+        if not _column_exists("power_model_config", "decision_logic", conn):
+            conn.execute(text("ALTER TABLE power_model_config ADD COLUMN decision_logic VARCHAR DEFAULT 'capacity_based'"))
+            conn.commit()
+        if not _column_exists("power_model_config", "carrier_threshold", conn):
+            conn.execute(text("ALTER TABLE power_model_config ADD COLUMN carrier_threshold FLOAT DEFAULT 70.0"))
+            conn.commit()
+
         # Add indexes for efficient date-range and weekday queries
         indexes = [
             ("ix_kpi_carrier_date", "CREATE INDEX IF NOT EXISTS ix_kpi_carrier_date ON kpi_hourly (carrier_id, date)"),
