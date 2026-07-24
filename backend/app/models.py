@@ -110,6 +110,6 @@ class PowerModelConfig(Base):
     capacity_ceiling = Column(Float, default=80.0)
     target_band_low = Column(Float, default=70.0)
     target_band_high = Column(Float, default=80.0)
-    decision_logic = Column(String, default="capacity_based")
+    decision_logic = Column(String, default="threshold_based")
     carrier_threshold = Column(Float, default=70.0)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

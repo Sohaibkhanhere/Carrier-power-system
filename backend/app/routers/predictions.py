@@ -413,7 +413,7 @@ def test_scenario(
     from app.services.power import capacity_decide, threshold_decide
 
     pconfig = power.get_power_config(db)
-    logic = pconfig.get("decision_logic", "capacity_based")
+    logic = pconfig.get("decision_logic", "threshold_based")
 
     carrier_loads = [
         {"sector_label": "A", "activation_order": 0, "predicted_prb": load_a},

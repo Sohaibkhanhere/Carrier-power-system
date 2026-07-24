@@ -23,7 +23,7 @@ DEFAULTS = {
     "capacity_ceiling": 80.0,
     "target_band_low": 70.0,
     "target_band_high": 80.0,
-    "decision_logic": "capacity_based",
+    "decision_logic": "threshold_based",
     "carrier_threshold": 70.0,
 }
 
@@ -43,7 +43,7 @@ def get_power_config(db: Session) -> dict:
         "capacity_ceiling": cfg.capacity_ceiling,
         "target_band_low": cfg.target_band_low,
         "target_band_high": cfg.target_band_high,
-        "decision_logic": cfg.decision_logic or "capacity_based",
+        "decision_logic": cfg.decision_logic or "threshold_based",
         "carrier_threshold": cfg.carrier_threshold or 70.0,
     }
 

@@ -21,7 +21,7 @@ def make_decisions_for_hour(target_date: date, hour: int, db: Session) -> list[d
     """Evaluate all towers for a given date+hour using the configured decision logic."""
     pconfig = get_power_config(db)
     ceiling = pconfig["capacity_ceiling"]
-    logic = pconfig.get("decision_logic", "capacity_based")
+    logic = pconfig.get("decision_logic", "threshold_based")
     threshold = pconfig.get("carrier_threshold", 70.0)
     towers = db.query(models.Tower).all()
     results = []

@@ -75,7 +75,7 @@ def init_db():
 
         # v4 migration: decision logic selector
         if not _column_exists("power_model_config", "decision_logic", conn):
-            conn.execute(text("ALTER TABLE power_model_config ADD COLUMN decision_logic VARCHAR DEFAULT 'capacity_based'"))
+            conn.execute(text("ALTER TABLE power_model_config ADD COLUMN decision_logic VARCHAR DEFAULT 'threshold_based'"))
             conn.commit()
         if not _column_exists("power_model_config", "carrier_threshold", conn):
             conn.execute(text("ALTER TABLE power_model_config ADD COLUMN carrier_threshold FLOAT DEFAULT 70.0"))

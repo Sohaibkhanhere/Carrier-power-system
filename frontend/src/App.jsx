@@ -1383,7 +1383,7 @@ function TestScenarioTool() {
     fetch(`${API}/capacity-config`).then((r) => r.json()).then(setConfig).catch(console.error);
   }, []);
 
-  const logic = config?.decision_logic || "capacity_based";
+  const logic = config?.decision_logic || "threshold_based";
   const threshold = config?.carrier_threshold ?? 70;
 
   const runTest = useCallback(() => {
@@ -1520,7 +1520,7 @@ function CapacitySettings({ onSaved }) {
           <div>
             <label htmlFor="decision-logic" className="block text-xs mb-1" style={{ color: PALETTE.textMuted }}>Algorithm</label>
             <select id="decision-logic" name="decision-logic"
-              value={config.decision_logic || "capacity_based"}
+              value={config.decision_logic || "threshold_based"}
               onChange={(e) => setConfig((c) => ({ ...c, decision_logic: e.target.value }))}
               className="w-full rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
               style={{ background: PALETTE.bg, color: PALETTE.text, border: `1px solid ${PALETTE.border}`, colorScheme: "dark" }}>
@@ -2227,7 +2227,7 @@ function AdminPage({ onBack, onRefresh }) {
               <div className="mb-2">
                 <label htmlFor="admin-decision-logic" className="block text-xs mb-1" style={{ color: PALETTE.textMuted }}>Algorithm</label>
                 <select id="admin-decision-logic" name="decision_logic"
-                  value={powerConfig.decision_logic || "capacity_based"}
+                  value={powerConfig.decision_logic || "threshold_based"}
                   onChange={(e) => setPowerConfig((c) => ({ ...c, decision_logic: e.target.value }))}
                   className="rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
                   style={{ background: PALETTE.bg, color: PALETTE.text, border: `1px solid ${PALETTE.border}`, colorScheme: "dark" }}>
@@ -2393,6 +2393,9 @@ export default function App() {
             <div className="text-right">
               <div className="text-xs" style={{ color: PALETTE.textMuted }}>Current Time</div>
               <div className="text-sm font-mono font-bold" style={{ color: PALETTE.text }}>{liveStatus ? `${liveStatus.date} ${String(liveStatus.hour).padStart(2, "0")}:00` : "Loading…"}</div>
+              <div className="mt-1 inline-block text-[10px] font-mono font-bold px-2 py-0.5 rounded-full" style={{ background: PALETTE.amber + "25", color: PALETTE.amber }}>
+                {capacityConfig?.decision_logic === "threshold_based" ? "LOGIC 2" : "LOGIC 1"}
+              </div>
             </div>
             <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: PALETTE.green }} />
           </div>
