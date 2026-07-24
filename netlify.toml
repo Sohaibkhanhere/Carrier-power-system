@@ -5,6 +5,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  VITE_API_URL = "https://carrier-power-system-api-production-d1d5.up.railway.app/api"
 
 [[redirects]]
   from = "/*"

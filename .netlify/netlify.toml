@@ -7,7 +7,7 @@ headers = []
 [functions."*"]
 
 [build]
-publish = "D:\\Antigravity\\Carrier Power System\\frontend\\dist"
+publish = "D:\\Antigravity\\Carrier Power System\\dist"
 publishOrigin = "config"
 commandOrigin = "config"
 command = "npm run build"
@@ -15,6 +15,7 @@ base = "D:\\Antigravity\\Carrier Power System\\frontend"
 
 [build.environment]
 NODE_VERSION = "20"
+VITE_API_URL = "https://carrier-power-system-api-production-d1d5.up.railway.app/api"
 
 [build.processing]
 
