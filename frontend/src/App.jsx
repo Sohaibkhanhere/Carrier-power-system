@@ -1677,21 +1677,29 @@ function FiltersPanel({ filters, setFilters, towers, capacityConfig, onRefresh }
           )}
         </div>
 
-        <div className="pt-2 space-y-2">
-          {[
-            { href: `${API}/export/summary-demo?${new URLSearchParams({ ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export Data Report" },
-            { href: `${API}/export/predictions-demo?days=7`, label: "Export Future Predictions" },
-            { href: `${API}/export/kpi?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.carrier && { carrier: filters.carrier }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export KPI Data" },
-            { href: `${API}/export/decisions?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export Decisions" },
-            { href: `${API}/export/power-energy?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export Power / Energy" },
-            { href: `${API}/export/thesis-report`, label: "Export Thesis Report" },
-          ].map((btn) => (
-            <a key={btn.label} href={btn.href}
-              className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition-colors"
-              style={{ background: PALETTE.bg, color: PALETTE.textMuted, border: `1px solid ${PALETTE.border}`, textDecoration: "none" }}>
-              <Download size={14} /> {btn.label}
-            </a>
-          ))}
+        <div className="pt-3">
+          <div className="text-[10px] uppercase tracking-widest mb-2" style={{ color: PALETTE.textMuted }}>Quick Exports</div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { href: `${API}/export/summary-demo?${new URLSearchParams({ ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Data Report", icon: Database },
+              { href: `${API}/export/predictions-demo?days=7`, label: "Predictions", icon: FlaskConical },
+              { href: `${API}/export/kpi?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.carrier && { carrier: filters.carrier }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "KPI Data", icon: Zap },
+              { href: `${API}/export/decisions?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Decisions", icon: Shield },
+              { href: `${API}/export/power-energy?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Power", icon: Battery },
+              { href: `${API}/export/thesis-report`, label: "Thesis", icon: Download },
+            ].map((btn) => {
+              const Icon = btn.icon;
+              return (
+                <a key={btn.label} href={btn.href}
+                  className="flex flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center transition-all hover:scale-[1.03]"
+                  style={{ background: PALETTE.bg, border: `1px solid ${PALETTE.border}`, textDecoration: "none" }}
+                  title={`Export ${btn.label}`}>
+                  <Icon size={16} style={{ color: PALETTE.textMuted }} />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: PALETTE.textMuted }}>{btn.label}</span>
+                </a>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
