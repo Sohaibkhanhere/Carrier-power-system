@@ -1679,16 +1679,16 @@ function FiltersPanel({ filters, setFilters, towers, capacityConfig, onRefresh }
 
         <div className="pt-2 space-y-2">
           {[
-            { href: `${API}/export/summary-demo?${new URLSearchParams({ ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export Data Report", color: PALETTE.green },
-            { href: `${API}/export/predictions-demo?days=7`, label: "Export Future Predictions", color: PALETTE.amber },
-            { href: `${API}/export/kpi?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.carrier && { carrier: filters.carrier }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export KPI Data", color: PALETTE.cyan },
-            { href: `${API}/export/decisions?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export Decisions", color: PALETTE.purple },
-            { href: `${API}/export/power-energy?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export Power / Energy", color: PALETTE.pink },
-            { href: `${API}/export/thesis-report`, label: "Export Thesis Report", color: PALETTE.accent },
+            { href: `${API}/export/summary-demo?${new URLSearchParams({ ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export Data Report" },
+            { href: `${API}/export/predictions-demo?days=7`, label: "Export Future Predictions" },
+            { href: `${API}/export/kpi?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.carrier && { carrier: filters.carrier }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export KPI Data" },
+            { href: `${API}/export/decisions?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export Decisions" },
+            { href: `${API}/export/power-energy?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export Power / Energy" },
+            { href: `${API}/export/thesis-report`, label: "Export Thesis Report" },
           ].map((btn) => (
             <a key={btn.label} href={btn.href}
               className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition-colors"
-              style={{ background: btn.color + "15", color: btn.color, border: `1px solid ${btn.color}30`, textDecoration: "none" }}>
+              style={{ background: PALETTE.bg, color: PALETTE.textMuted, border: `1px solid ${PALETTE.border}`, textDecoration: "none" }}>
               <Download size={14} /> {btn.label}
             </a>
           ))}
