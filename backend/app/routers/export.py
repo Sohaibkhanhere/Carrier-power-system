@@ -422,7 +422,6 @@ def export_thesis_report(db: Session = Depends(get_db)):
 def _build_demo_summary_excel(date_from: date, date_to: date, db: Session) -> BytesIO:
     from datetime import timedelta
     from app.services.power import get_power_config
-    from app.services import decision
 
     pconfig = get_power_config(db)
     p_a = pconfig.get("carrier_a_watts", 300.0)
@@ -433,7 +432,36 @@ def _build_demo_summary_excel(date_from: date, date_to: date, db: Session) -> By
     tower_a = next((t for t in towers if "A" in t.tower_label.upper()), towers[0] if towers else None)
     tower_b = next((t for t in towers if "B" in t.tower_label.upper()), towers[1] if len(towers) > 1 else tower_a)
 
-    curr = date_from
+    carriers = db.query(models.Carrier).all()
+    carrier_map = {}
+    for c in carriers:
+        carrier_map[(c.tower_id, c.sector_label)] = c
+
+    decisions = (
+        db.query(models.Decision)
+        .filter(models.Decision.date >= date_from, models.Decision.date <= date_to)
+        .order_by(models.Decision.date, models.Decision.hour)
+        .all()
+    )
+
+    dec_by_key = {}
+    for d in decisions:
+        key = (d.date, d.hour, d.tower_id)
+        if key not in dec_by_key:
+            dec_by_key[key] = d
+
+    def _get_pred_prb(tower_id, sector_label, dt_date, hour):
+        c = carrier_map.get((tower_id, sector_label))
+        if c:
+            pred = (
+                db.query(models.Prediction)
+                .filter(models.Prediction.carrier_id == c.id, models.Prediction.target_date == dt_date, models.Prediction.target_hour == hour)
+                .first()
+            )
+            if pred:
+                return pred.predicted_prb
+        return 50.0
+
     data_rows = []
     log_rows = []
 
@@ -451,30 +479,28 @@ def _build_demo_summary_excel(date_from: date, date_to: date, db: Session) -> By
 
     total_hours = 0
 
+    curr = date_from
     while curr <= date_to:
         for hour in range(24):
             total_hours += 1
-            decision_res = decision.make_decisions_for_hour(curr, hour, db)
 
-            dec_a = next((d for d in decision_res if d["tower_id"] == (tower_a.id if tower_a else -1)), decision_res[0] if decision_res else {})
-            dec_b = next((d for d in decision_res if d["tower_id"] == (tower_b.id if tower_b else -1)), decision_res[-1] if decision_res else {})
+            day_str = str(curr)
 
-            c_a = dec_a.get("carriers", [])
-            c_b = dec_b.get("carriers", [])
+            d_a = dec_by_key.get((curr, hour, tower_a.id) if tower_a else None)
+            d_b = dec_by_key.get((curr, hour, tower_b.id) if tower_b else None)
 
-            a_b_on = any(c.get("sector_label", "").endswith("_B") and c.get("is_on") for c in c_a)
-            a_c_on = any(c.get("sector_label", "").endswith("_C") and c.get("is_on") for c in c_a)
+            a_b_on = d_a.carrier_b_state == "ON" if d_a else True
+            a_c_on = d_a.carrier_c_state == "ON" if d_a else True
+            b_b_on = d_b.carrier_b_state == "ON" if d_b else True
+            b_c_on = d_b.carrier_c_state == "ON" if d_b else True
 
-            b_b_on = any(c.get("sector_label", "").endswith("_B") and c.get("is_on") for c in c_b)
-            b_c_on = any(c.get("sector_label", "").endswith("_C") and c.get("is_on") for c in c_b)
+            prb_a_1 = round(_get_pred_prb(tower_a.id, "A", curr, hour) if tower_a else 50.0, 1)
+            prb_a_2 = round(_get_pred_prb(tower_a.id, "B", curr, hour) if tower_a else 50.0, 1)
+            prb_a_3 = round(_get_pred_prb(tower_a.id, "C", curr, hour) if tower_a else 50.0, 1)
 
-            prb_a_1 = c_a[0].get("predicted_prb", 50.0) if len(c_a) > 0 else 50.0
-            prb_a_2 = c_a[1].get("predicted_prb", 50.0) if len(c_a) > 1 else 50.0
-            prb_a_3 = c_a[2].get("predicted_prb", 50.0) if len(c_a) > 2 else 50.0
-
-            prb_b_1 = c_b[0].get("predicted_prb", 50.0) if len(c_b) > 0 else 50.0
-            prb_b_2 = c_b[1].get("predicted_prb", 50.0) if len(c_b) > 1 else 50.0
-            prb_b_3 = c_b[2].get("predicted_prb", 50.0) if len(c_b) > 2 else 50.0
+            prb_b_1 = round(_get_pred_prb(tower_b.id, "A", curr, hour) if tower_b else 50.0, 1)
+            prb_b_2 = round(_get_pred_prb(tower_b.id, "B", curr, hour) if tower_b else 50.0, 1)
+            prb_b_3 = round(_get_pred_prb(tower_b.id, "C", curr, hour) if tower_b else 50.0, 1)
 
             pow_a_act = p_a + (p_b if a_b_on else 0) + (p_c if a_c_on else 0)
             pow_a_base = p_a + p_b + p_c
@@ -494,22 +520,17 @@ def _build_demo_summary_excel(date_from: date, date_to: date, db: Session) -> By
             if b_b_on: b2_active += 1
             if b_c_on: b3_active += 1
 
-            day_str = str(curr)
-
-            # Row 1: A1 & B1
             data_rows.append({
-                "Days": day_str, "Hour": hour, "TowerA": "A1", "Prb": round(prb_a_1, 1), "RRU Power": p_a, "Stutus": "ON",
-                "Days.1": day_str, "Hour.1": hour, "TowerA.1": "B1", "Prb.1": round(prb_b_1, 1), "RRU Power.1": p_a, "Stutus.1": "ON"
+                "Days": day_str, "Hour": hour, "TowerA": "A1", "Prb": prb_a_1, "RRU Power": p_a, "Stutus": "ON",
+                "Days.1": day_str, "Hour.1": hour, "TowerA.1": "B1", "Prb.1": prb_b_1, "RRU Power.1": p_a, "Stutus.1": "ON"
             })
-            # Row 2: A2 & B2
             data_rows.append({
-                "Days": day_str, "Hour": hour, "TowerA": "A2", "Prb": round(prb_a_2, 1), "RRU Power": p_b, "Stutus": "ON" if a_b_on else "OFF",
-                "Days.1": day_str, "Hour.1": hour, "TowerA.1": "B2", "Prb.1": round(prb_b_2, 1), "RRU Power.1": p_b, "Stutus.1": "ON" if b_b_on else "OFF"
+                "Days": day_str, "Hour": hour, "TowerA": "A2", "Prb": prb_a_2, "RRU Power": p_b, "Stutus": "ON" if a_b_on else "OFF",
+                "Days.1": day_str, "Hour.1": hour, "TowerA.1": "B2", "Prb.1": prb_b_2, "RRU Power.1": p_b, "Stutus.1": "ON" if b_b_on else "OFF"
             })
-            # Row 3: A3 & B3
             data_rows.append({
-                "Days": day_str, "Hour": hour, "TowerA": "A3", "Prb": round(prb_a_3, 1), "RRU Power": p_c, "Stutus": "ON" if a_c_on else "OFF",
-                "Days.1": day_str, "Hour.1": hour, "TowerA.1": "B3", "Prb.1": round(prb_b_3, 1), "RRU Power.1": p_c, "Stutus.1": "ON" if b_c_on else "OFF"
+                "Days": day_str, "Hour": hour, "TowerA": "A3", "Prb": prb_a_3, "RRU Power": p_c, "Stutus": "ON" if a_c_on else "OFF",
+                "Days.1": day_str, "Hour.1": hour, "TowerA.1": "B3", "Prb.1": prb_b_3, "RRU Power.1": p_c, "Stutus.1": "ON" if b_c_on else "OFF"
             })
 
             str_a = "A1 active, A2and A3 active" if (a_b_on and a_c_on) else ("A1 active, A2and A3 inactive" if (not a_b_on and not a_c_on) else "A1 active, A2 active, A3 inactive")
