@@ -1374,7 +1374,6 @@ function PowerEnergyChart({ days }) {
 
 function TestScenarioTool() {
   const [loads, setLoads] = useState({ a: 50, b: 40, c: 30 });
-  const [ceiling, setCeiling] = useState(80);
   const [config, setConfig] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1383,18 +1382,17 @@ function TestScenarioTool() {
     fetch(`${API}/capacity-config`).then((r) => r.json()).then(setConfig).catch(console.error);
   }, []);
 
-  const logic = config?.decision_logic || "threshold_based";
   const threshold = config?.carrier_threshold ?? 70;
 
   const runTest = useCallback(() => {
     setLoading(true);
-    const params = `load_a=${loads.a}&load_b=${loads.b}&load_c=${loads.c}&ceiling=${ceiling}`;
+    const params = `load_a=${loads.a}&load_b=${loads.b}&load_c=${loads.c}&ceiling=80`;
     fetch(`${API}/test-scenario?${params}`)
       .then((r) => r.json())
       .then(setResult)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [loads, ceiling]);
+  }, [loads]);
 
   useEffect(() => { runTest(); }, [runTest]);
 
@@ -1403,14 +1401,6 @@ function TestScenarioTool() {
       <div className="flex items-center gap-2 mb-4">
         <FlaskConical size={16} style={{ color: PALETTE.purple }} />
         <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: PALETTE.textMuted }}>Test Scenario</h3>
-        {config && (
-          <span className="ml-auto text-[10px] font-mono px-2 py-0.5 rounded-full" style={{
-            background: logic === "threshold_based" ? PALETTE.purple + "25" : PALETTE.amber + "25",
-            color: logic === "threshold_based" ? PALETTE.purple : PALETTE.amber,
-          }}>
-                        {logic === "threshold_based" ? "LOGIC 2" : "LOGIC 1"}
-          </span>
-        )}
       </div>
 
       <div className="grid grid-cols-3 gap-2 mb-3">
@@ -1425,26 +1415,15 @@ function TestScenarioTool() {
         ))}
       </div>
 
-      {logic === "threshold_based" ? (
-        <div className="mb-3 rounded-xl p-3" style={{ background: PALETTE.bg, border: `1px solid ${PALETTE.border}` }}>
-              <div className="text-[10px] uppercase tracking-wider mb-2" style={{ color: PALETTE.purple }}>Logic 2 — Threshold</div>
-          <div className="text-xs" style={{ color: PALETTE.textMuted }}>
-            If any carrier &gt; <span className="font-mono font-bold" style={{ color: PALETTE.purple }}>{threshold}%</span> &rarr; all carriers ON
-          </div>
-          <div className="text-xs mt-1" style={{ color: PALETTE.textMuted }}>
-            If all carriers &le; <span className="font-mono font-bold" style={{ color: PALETTE.purple }}>{threshold}%</span> &rarr; only Carrier A ON
-          </div>
+      <div className="mb-3 rounded-xl p-3" style={{ background: PALETTE.bg, border: `1px solid ${PALETTE.border}` }}>
+        <div className="text-[10px] uppercase tracking-wider mb-2" style={{ color: PALETTE.purple }}>Threshold Logic</div>
+        <div className="text-xs" style={{ color: PALETTE.textMuted }}>
+          If any carrier &gt; <span className="font-mono font-bold" style={{ color: PALETTE.purple }}>{threshold}%</span> &rarr; all carriers ON
         </div>
-      ) : (
-        <div className="mb-3">
-          <label htmlFor="test-ceiling" className="block text-xs mb-1" style={{ color: PALETTE.textMuted }}>
-            Ceiling: <span className="font-mono font-bold" style={{ color: PALETTE.amber }}>{ceiling}%</span>
-          </label>
-          <input id="test-ceiling" type="range" min="30" max="95" step="5" name="capacity-ceiling" value={ceiling}
-            onChange={(e) => setCeiling(Number(e.target.value))}
-            className="w-full accent-amber-500" />
+        <div className="text-xs mt-1" style={{ color: PALETTE.textMuted }}>
+          If all carriers &le; <span className="font-mono font-bold" style={{ color: PALETTE.purple }}>{threshold}%</span> &rarr; only Carrier A ON
         </div>
-      )}
+      </div>
 
       {result && (
         <div className="rounded-xl p-3 space-y-2" style={{ background: PALETTE.bg, border: `1px solid ${PALETTE.border}` }}>
@@ -1516,49 +1495,18 @@ function CapacitySettings({ onSaved }) {
 
       {expanded && config && (
         <div className="px-5 pb-5 space-y-3">
-          <div className="text-xs font-semibold uppercase tracking-wider pt-1" style={{ color: PALETTE.cyan }}>Decision Logic</div>
+          <div className="text-xs font-semibold uppercase tracking-wider pt-1" style={{ color: PALETTE.purple }}>Threshold-Based Decision Engine</div>
           <div>
-            <label htmlFor="decision-logic" className="block text-xs mb-1" style={{ color: PALETTE.textMuted }}>Algorithm</label>
-            <select id="decision-logic" name="decision-logic"
-              value={config.decision_logic || "threshold_based"}
-              onChange={(e) => setConfig((c) => ({ ...c, decision_logic: e.target.value }))}
-              className="w-full rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
-              style={{ background: PALETTE.bg, color: PALETTE.text, border: `1px solid ${PALETTE.border}`, colorScheme: "dark" }}>
-              <option value="capacity_based">Logic 1 — Capacity-Based (total demand / n &le; ceiling)</option>
-              <option value="threshold_based">Logic 2 — Threshold-Based (any carrier &gt; threshold &rarr; all ON)</option>
-            </select>
+            <label htmlFor="cap-carrier_threshold" className="block text-xs mb-1" style={{ color: PALETTE.textMuted }}>Carrier Threshold (%)</label>
+            <input id="cap-carrier_threshold" type="number" name="carrier_threshold" step={1} value={config.carrier_threshold ?? 70}
+              onChange={(e) => setConfig((c) => ({ ...c, carrier_threshold: Number(e.target.value) }))}
+              className="w-full rounded-xl px-3 py-2 text-sm font-mono outline-none"
+              style={{ background: PALETTE.bg, color: PALETTE.purple, border: `1px solid ${PALETTE.border}` }} />
+            <div className="text-[10px] mt-1 space-y-0.5" style={{ color: PALETTE.textMuted }}>
+              <div>• Traffic &gt; {config.carrier_threshold ?? 70}% &rarr; <span style={{ color: PALETTE.green, fontWeight: 600 }}>All Carriers ON (A, B, C)</span></div>
+              <div>• Traffic &le; {config.carrier_threshold ?? 70}% &rarr; <span style={{ color: PALETTE.amber, fontWeight: 600 }}>Only Carrier A ON (B & C OFF)</span></div>
+            </div>
           </div>
-
-          {config.decision_logic === "threshold_based" ? (
-            <>
-              <div className="text-xs font-semibold uppercase tracking-wider pt-1" style={{ color: PALETTE.purple }}>Logic 2 — Threshold</div>
-              <div>
-                <label htmlFor="cap-carrier_threshold" className="block text-xs mb-1" style={{ color: PALETTE.textMuted }}>Carrier Threshold (%)</label>
-                <input id="cap-carrier_threshold" type="number" name="carrier_threshold" step={1} value={config.carrier_threshold ?? 70}
-                  onChange={(e) => setConfig((c) => ({ ...c, carrier_threshold: Number(e.target.value) }))}
-                  className="w-full rounded-xl px-3 py-2 text-sm font-mono outline-none"
-                  style={{ background: PALETTE.bg, color: PALETTE.purple, border: `1px solid ${PALETTE.border}` }} />
-                <div className="text-[10px] mt-1" style={{ color: PALETTE.textMuted }}>If any carrier exceeds this %, all carriers turn ON</div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-xs font-semibold uppercase tracking-wider pt-1" style={{ color: PALETTE.cyan }}>Logic 1 — Capacity-Based</div>
-              {[
-                { key: "capacity_ceiling", label: "Capacity Ceiling (%)", color: PALETTE.amber, step: 1 },
-                { key: "target_band_low", label: "Target Band Low (%)", color: PALETTE.green, step: 1 },
-                { key: "target_band_high", label: "Target Band High (%)", color: PALETTE.green, step: 1 },
-              ].map((field) => (
-                <div key={field.key}>
-                  <label htmlFor={`cap-${field.key}`} className="block text-xs mb-1" style={{ color: PALETTE.textMuted }}>{field.label}</label>
-                  <input id={`cap-${field.key}`} type="number" name={field.key} step={field.step} value={config[field.key]}
-                    onChange={(e) => setConfig((c) => ({ ...c, [field.key]: Number(e.target.value) }))}
-                    className="w-full rounded-xl px-3 py-2 text-sm font-mono outline-none"
-                    style={{ background: PALETTE.bg, color: field.color, border: `1px solid ${PALETTE.border}` }} />
-                </div>
-              ))}
-            </>
-          )}
 
           <div className="text-xs font-semibold uppercase tracking-wider pt-2" style={{ color: PALETTE.cyan }}>Power Model (Watts)</div>
           {[
@@ -1730,6 +1678,14 @@ function FiltersPanel({ filters, setFilters, towers, capacityConfig, onRefresh }
         </div>
 
         <div className="pt-2 space-y-2">
+          <a href={`${API}/export/summary-demo?${new URLSearchParams({ ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`}
+            className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors" style={{ background: PALETTE.green + "20", color: PALETTE.green, border: `1px solid ${PALETTE.green}40`, textDecoration: "none" }}>
+            <Download size={14} /> Demo Summary Excel (.xlsx)
+          </a>
+          <a href={`${API}/export/predictions-demo?${new URLSearchParams({ ...(filters.dateFrom && { date_from: filters.dateFrom }), days: "7" })}`}
+            className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors" style={{ background: PALETTE.amber + "20", color: PALETTE.amber, border: `1px solid ${PALETTE.amber}40`, textDecoration: "none" }}>
+            <Download size={14} /> Export Future Predictions (.xlsx)
+          </a>
           <a href={`${API}/export/kpi?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.carrier && { carrier: filters.carrier }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`}
             className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors" style={{ background: PALETTE.bg, color: PALETTE.textMuted, border: `1px solid ${PALETTE.border}`, textDecoration: "none" }}>
             <Download size={14} /> Export KPI Data
@@ -2223,47 +2179,19 @@ function AdminPage({ onBack, onRefresh }) {
             <h3 className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: PALETTE.cyan }}>Power Model & Decision Logic</h3>
 
             <div className="mb-4">
-              <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: PALETTE.cyan }}>Decision Logic</div>
+              <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: PALETTE.purple }}>Threshold-Based Decision Engine</div>
               <div className="mb-2">
-                <label htmlFor="admin-decision-logic" className="block text-xs mb-1" style={{ color: PALETTE.textMuted }}>Algorithm</label>
-                <select id="admin-decision-logic" name="decision_logic"
-                  value={powerConfig.decision_logic || "threshold_based"}
-                  onChange={(e) => setPowerConfig((c) => ({ ...c, decision_logic: e.target.value }))}
-                  className="rounded-xl px-3 py-2 text-sm outline-none cursor-pointer"
-                  style={{ background: PALETTE.bg, color: PALETTE.text, border: `1px solid ${PALETTE.border}`, colorScheme: "dark" }}>
-                  <option value="capacity_based">Logic 1 — Capacity-Based (total demand / n &le; ceiling)</option>
-                  <option value="threshold_based">Logic 2 — Threshold-Based (any carrier &gt; threshold &rarr; all ON)</option>
-                </select>
+                <label htmlFor="admin-carrier-threshold" className="block text-xs mb-1" style={{ color: PALETTE.textMuted }}>Carrier Threshold (%)</label>
+                <input id="admin-carrier-threshold" type="number" name="carrier_threshold" step={1} value={powerConfig.carrier_threshold ?? 70}
+                  onChange={(e) => setPowerConfig((c) => ({ ...c, carrier_threshold: Number(e.target.value) }))}
+                  className={inputClass} style={{ ...inputStyle, color: PALETTE.purple }} />
+                <div className="text-[10px] mt-1" style={{ color: PALETTE.textMuted }}>If any carrier exceeds this %, all carriers turn ON</div>
               </div>
-              {powerConfig.decision_logic === "threshold_based" && (
-                <div className="mb-2">
-                  <label htmlFor="admin-carrier-threshold" className="block text-xs mb-1" style={{ color: PALETTE.textMuted }}>Carrier Threshold (%)</label>
-                  <input id="admin-carrier-threshold" type="number" name="carrier_threshold" step={1} value={powerConfig.carrier_threshold ?? 70}
-                    onChange={(e) => setPowerConfig((c) => ({ ...c, carrier_threshold: Number(e.target.value) }))}
-                    className={inputClass} style={{ ...inputStyle, color: PALETTE.purple }} />
-                  <div className="text-[10px] mt-1" style={{ color: PALETTE.textMuted }}>If any carrier exceeds this %, all carriers turn ON</div>
-                </div>
-              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: PALETTE.green }}>Logic 1 — Capacity-Based</div>
-                {[
-                  { key: "capacity_ceiling", label: "Capacity Ceiling (%)", step: 1 },
-                  { key: "target_band_low", label: "Target Band Low (%)", step: 1 },
-                  { key: "target_band_high", label: "Target Band High (%)", step: 1 },
-                ].map((field) => (
-                  <div key={field.key} className="mb-2">
-                    <label htmlFor={`admin-cap-${field.key}`} className="block text-xs mb-1" style={{ color: PALETTE.textMuted }}>{field.label}</label>
-                    <input id={`admin-cap-${field.key}`} type="number" name={field.key} step={field.step} value={powerConfig[field.key]}
-                      onChange={(e) => setPowerConfig((c) => ({ ...c, [field.key]: Number(e.target.value) }))}
-                      className={inputClass} style={{ ...inputStyle, color: PALETTE.amber }} />
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: PALETTE.purple }}>Power Model (Watts)</div>
+                <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: PALETTE.cyan }}>Power Model (Watts)</div>
                 {[
                   { key: "carrier_a_watts", label: "Carrier A (W)", step: 100 },
                   { key: "carrier_b_watts", label: "Carrier B (W)", step: 100 },
@@ -2386,16 +2314,13 @@ export default function App() {
             <img src="/favicon.svg" alt="Logo" className="w-10 h-10 rounded-xl" />
             <div>
               <h1 className="text-base font-bold tracking-tight" style={{ color: PALETTE.text }}>Carrier Power System</h1>
-              <p className="text-xs" style={{ color: PALETTE.textMuted }}>Capacity-Based Traffic-Aware Adaptive Carrier Management</p>
+              <p className="text-xs" style={{ color: PALETTE.textMuted }}>Threshold-Based Traffic-Aware Adaptive Carrier Management</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
               <div className="text-xs" style={{ color: PALETTE.textMuted }}>Current Time</div>
               <div className="text-sm font-mono font-bold" style={{ color: PALETTE.text }}>{liveStatus ? `${liveStatus.date} ${String(liveStatus.hour).padStart(2, "0")}:00` : "Loading…"}</div>
-              <div className="mt-1 inline-block text-[10px] font-mono font-bold px-2 py-0.5 rounded-full" style={{ background: PALETTE.amber + "25", color: PALETTE.amber }}>
-                {capacityConfig?.decision_logic === "threshold_based" ? "LOGIC 2" : "LOGIC 1"}
-              </div>
             </div>
             <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: PALETTE.green }} />
           </div>

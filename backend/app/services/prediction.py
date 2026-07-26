@@ -159,9 +159,9 @@ def predict_now(db: Session) -> dict:
         .all()
     )
 
-    from app.services.power import get_power_config, compute_tower_power, capacity_decide
+    from app.services.power import get_power_config, compute_tower_power, threshold_decide
     pconfig = get_power_config(db)
-    ceiling = pconfig["capacity_ceiling"]
+    threshold = pconfig.get("carrier_threshold", 70.0)
 
     tower_results = {}
     for carrier in carriers:
@@ -173,7 +173,7 @@ def predict_now(db: Session) -> dict:
                 "carriers": [],
                 "tower_power_watts": 0,
                 "total_demand": 0,
-                "capacity_ceiling": ceiling,
+                "carrier_threshold": threshold,
                 "active_count": 0,
                 "mode": "unknown",
             }
@@ -186,10 +186,10 @@ def predict_now(db: Session) -> dict:
             "current_hour": current_hour,
             "date": str(today),
             **pred,
-            "is_on": False,  # will be set by capacity_decide below
+            "is_on": False,  # will be set by threshold_decide below
         })
 
-    # Run capacity-based decision for each tower
+    # Run threshold-based decision for each tower
     for tower_label, tower_data in tower_results.items():
         carrier_loads = [
             {
@@ -199,7 +199,7 @@ def predict_now(db: Session) -> dict:
             }
             for c in sorted(tower_data["carriers"], key=lambda x: x["activation_order"])
         ]
-        dec = capacity_decide(carrier_loads, ceiling)
+        dec = threshold_decide(carrier_loads, threshold)
 
         # Update carrier ON/OFF states from decision result
         on_map = {c["sector_label"]: c["is_on"] for c in dec["carriers"]}

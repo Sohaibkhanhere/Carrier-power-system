@@ -40,11 +40,8 @@ def make_decisions_for_hour(target_date: date, hour: int, db: Session) -> list[d
                 "predicted_prb": pred["predicted_prb"],
             })
 
-        # Dispatch to the configured decision logic
-        if logic == "threshold_based":
-            decision_result = threshold_decide(carrier_loads, threshold)
-        else:
-            decision_result = capacity_decide(carrier_loads, ceiling)
+        # Always use Threshold-Based Decision Logic
+        decision_result = threshold_decide(carrier_loads, threshold)
 
         # Map carrier states back to B/C format for the decisions table
         carrier_states = {c["sector_label"]: c["is_on"] for c in decision_result["carriers"]}

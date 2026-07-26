@@ -417,3 +417,193 @@ def export_thesis_report(db: Session = Depends(get_db)):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=thesis_report.xlsx"},
     )
+
+
+def _build_demo_summary_excel(date_from: date, date_to: date, db: Session) -> BytesIO:
+    from datetime import timedelta
+    from app.services.power import get_power_config
+    from app.services import decision
+
+    pconfig = get_power_config(db)
+    p_a = pconfig.get("carrier_a_watts", 300.0)
+    p_b = pconfig.get("carrier_b_watts", 200.0)
+    p_c = pconfig.get("carrier_c_watts", 100.0)
+
+    towers = db.query(models.Tower).all()
+    tower_a = next((t for t in towers if "A" in t.tower_label.upper()), towers[0] if towers else None)
+    tower_b = next((t for t in towers if "B" in t.tower_label.upper()), towers[1] if len(towers) > 1 else tower_a)
+
+    curr = date_from
+    data_rows = []
+    log_rows = []
+
+    t_a_energy_actual = 0.0
+    t_a_energy_baseline = 0.0
+    t_b_energy_actual = 0.0
+    t_b_energy_baseline = 0.0
+
+    a1_active = 0
+    a2_active = 0
+    a3_active = 0
+    b1_active = 0
+    b2_active = 0
+    b3_active = 0
+
+    total_hours = 0
+
+    while curr <= date_to:
+        for hour in range(24):
+            total_hours += 1
+            decision_res = decision.make_decisions_for_hour(curr, hour, db)
+
+            dec_a = next((d for d in decision_res if d["tower_id"] == (tower_a.id if tower_a else -1)), decision_res[0] if decision_res else {})
+            dec_b = next((d for d in decision_res if d["tower_id"] == (tower_b.id if tower_b else -1)), decision_res[-1] if decision_res else {})
+
+            c_a = dec_a.get("carriers", [])
+            c_b = dec_b.get("carriers", [])
+
+            a_b_on = any(c.get("sector_label", "").endswith("_B") and c.get("is_on") for c in c_a)
+            a_c_on = any(c.get("sector_label", "").endswith("_C") and c.get("is_on") for c in c_a)
+
+            b_b_on = any(c.get("sector_label", "").endswith("_B") and c.get("is_on") for c in c_b)
+            b_c_on = any(c.get("sector_label", "").endswith("_C") and c.get("is_on") for c in c_b)
+
+            prb_a_1 = c_a[0].get("predicted_prb", 50.0) if len(c_a) > 0 else 50.0
+            prb_a_2 = c_a[1].get("predicted_prb", 50.0) if len(c_a) > 1 else 50.0
+            prb_a_3 = c_a[2].get("predicted_prb", 50.0) if len(c_a) > 2 else 50.0
+
+            prb_b_1 = c_b[0].get("predicted_prb", 50.0) if len(c_b) > 0 else 50.0
+            prb_b_2 = c_b[1].get("predicted_prb", 50.0) if len(c_b) > 1 else 50.0
+            prb_b_3 = c_b[2].get("predicted_prb", 50.0) if len(c_b) > 2 else 50.0
+
+            pow_a_act = p_a + (p_b if a_b_on else 0) + (p_c if a_c_on else 0)
+            pow_a_base = p_a + p_b + p_c
+            t_a_energy_actual += pow_a_act
+            t_a_energy_baseline += pow_a_base
+
+            pow_b_act = p_a + (p_b if b_b_on else 0) + (p_c if b_c_on else 0)
+            pow_b_base = p_a + p_b + p_c
+            t_b_energy_actual += pow_b_act
+            t_b_energy_baseline += pow_b_base
+
+            a1_active += 1
+            if a_b_on: a2_active += 1
+            if a_c_on: a3_active += 1
+
+            b1_active += 1
+            if b_b_on: b2_active += 1
+            if b_c_on: b3_active += 1
+
+            day_str = str(curr)
+
+            # Row 1: A1 & B1
+            data_rows.append({
+                "Days": day_str, "Hour": hour, "TowerA": "A1", "Prb": round(prb_a_1, 1), "RRU Power": p_a, "Stutus": "ON",
+                "Days.1": day_str, "Hour.1": hour, "TowerA.1": "B1", "Prb.1": round(prb_b_1, 1), "RRU Power.1": p_a, "Stutus.1": "ON"
+            })
+            # Row 2: A2 & B2
+            data_rows.append({
+                "Days": day_str, "Hour": hour, "TowerA": "A2", "Prb": round(prb_a_2, 1), "RRU Power": p_b, "Stutus": "ON" if a_b_on else "OFF",
+                "Days.1": day_str, "Hour.1": hour, "TowerA.1": "B2", "Prb.1": round(prb_b_2, 1), "RRU Power.1": p_b, "Stutus.1": "ON" if b_b_on else "OFF"
+            })
+            # Row 3: A3 & B3
+            data_rows.append({
+                "Days": day_str, "Hour": hour, "TowerA": "A3", "Prb": round(prb_a_3, 1), "RRU Power": p_c, "Stutus": "ON" if a_c_on else "OFF",
+                "Days.1": day_str, "Hour.1": hour, "TowerA.1": "B3", "Prb.1": round(prb_b_3, 1), "RRU Power.1": p_c, "Stutus.1": "ON" if b_c_on else "OFF"
+            })
+
+            str_a = "A1 active, A2and A3 active" if (a_b_on and a_c_on) else ("A1 active, A2and A3 inactive" if (not a_b_on and not a_c_on) else "A1 active, A2 active, A3 inactive")
+            str_b = "B1 active, B2and B3 active" if (b_b_on and b_c_on) else ("B1 active, B2and B3 inactive" if (not b_b_on and not b_c_on) else "B1 active, B2 active, B3 inactive")
+            log_rows.append({
+                "Days": day_str, "Hour": hour, "Tower A": str_a, "Tower B": str_b
+            })
+
+        curr += timedelta(days=1)
+
+    df_data = pd.DataFrame(data_rows)
+    df_log = pd.DataFrame(log_rows)
+
+    t_a_saved = t_a_energy_baseline - t_a_energy_actual
+    t_a_pct = (t_a_saved / t_a_energy_baseline * 100.0) if t_a_energy_baseline > 0 else 0.0
+
+    t_b_saved = t_b_energy_baseline - t_b_energy_actual
+    t_b_pct = (t_b_saved / t_b_energy_baseline * 100.0) if t_b_energy_baseline > 0 else 0.0
+
+    tot_energy_act = t_a_energy_actual + t_b_energy_actual
+    tot_energy_base = t_a_energy_baseline + t_b_energy_baseline
+    tot_saved = tot_energy_base - tot_energy_act
+    tot_pct = (tot_saved / tot_energy_base * 100.0) if tot_energy_base > 0 else 0.0
+
+    comb_active_hours = a2_active + a3_active + b2_active + b3_active
+    total_possible_hours = total_hours * 4
+    comb_inactive_hours = total_possible_hours - comb_active_hours
+
+    summary_data = [
+        {"Metric A": "Total Energy Consumption (W)", "Value": round(t_a_energy_actual, 2), "Unnamed: 2": None, "Metric B": "Total Energy Consumption (W)", "Value.1": round(t_b_energy_actual, 2)},
+        {"Metric A": "Total Energy Saved (W)", "Value": round(t_a_saved, 2), "Unnamed: 2": None, "Metric B": "Total Energy Saved (W)", "Value.1": round(t_b_saved, 2)},
+        {"Metric A": "Percentage Saved (%)", "Value": round(t_a_pct, 2), "Unnamed: 2": None, "Metric B": "Percentage Saved (%)", "Value.1": round(t_b_pct, 2)},
+        {"Metric A": "A1 Active Hours", "Value": a1_active, "Unnamed: 2": None, "Metric B": "B1 Active Hours", "Value.1": b1_active},
+        {"Metric A": "A2 Active Hours", "Value": a2_active, "Unnamed: 2": None, "Metric B": "B2 Active Hours", "Value.1": b2_active},
+        {"Metric A": "A3  Active Hours", "Value": a3_active, "Unnamed: 2": None, "Metric B": "B3  Active Hours", "Value.1": b3_active},
+        {"Metric A": None, "Value": None, "Unnamed: 2": None, "Metric B": None, "Value.1": None},
+        {"Metric A": None, "Value": None, "Unnamed: 2": None, "Metric B": None, "Value.1": None},
+        {"Metric A": None, "Value": None, "Unnamed: 2": None, "Metric B": None, "Value.1": None},
+        {"Metric A": "Metric(Towe A,Towe B)", "Value": "Value", "Unnamed: 2": None, "Metric B": None, "Value.1": None},
+        {"Metric A": "Total Energy Consumption (W)", "Value": round(tot_energy_act, 2), "Unnamed: 2": None, "Metric B": None, "Value.1": None},
+        {"Metric A": "Total Energy Saved (W)", "Value": round(tot_saved, 2), "Unnamed: 2": None, "Metric B": None, "Value.1": None},
+        {"Metric A": "Percentage Saved (%)", "Value": round(tot_pct, 2), "Unnamed: 2": None, "Metric B": None, "Value.1": None},
+        {"Metric A": "Active Hours", "Value": comb_active_hours, "Unnamed: 2": None, "Metric B": None, "Value.1": None},
+        {"Metric A": "Inctive Hours", "Value": comb_inactive_hours, "Unnamed: 2": None, "Metric B": None, "Value.1": None},
+    ]
+
+    df_summary = pd.DataFrame(summary_data)
+
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df_data.to_excel(writer, index=False, sheet_name="DAta")
+        df_log.to_excel(writer, index=False, sheet_name="Band Status Log")
+        df_summary.to_excel(writer, index=False, sheet_name="Summary")
+
+    buf.seek(0)
+    return buf
+
+
+@router.get("/summary-demo")
+def export_summary_demo(
+    date_from: date = Query(None),
+    date_to: date = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Export dataset summary in exact demo of summary.xlsx format (DAta, Band Status Log, Summary)."""
+    from datetime import datetime as dt, timedelta
+    if not date_from or not date_to:
+        min_max = db.query(func.min(models.KpiHourly.date), func.max(models.KpiHourly.date)).first()
+        date_from = date_from or (min_max[0] if min_max[0] else dt.now().date())
+        date_to = date_to or (min_max[1] if min_max[1] else dt.now().date())
+
+    buf = _build_demo_summary_excel(date_from, date_to, db)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=demo_summary_export_{date_from}_{date_to}.xlsx"},
+    )
+
+
+@router.get("/predictions-demo")
+def export_predictions_demo(
+    date_from: date = Query(None),
+    days: int = Query(7, ge=1, le=30),
+    db: Session = Depends(get_db),
+):
+    """Export future predicted data and decisions in demo of summary.xlsx format."""
+    from datetime import datetime as dt, timedelta
+    start_date = date_from or (dt.now().date() + timedelta(days=1))
+    end_date = start_date + timedelta(days=days - 1)
+
+    buf = _build_demo_summary_excel(start_date, end_date, db)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=future_predictions_summary_{start_date}_{end_date}.xlsx"},
+    )
+
