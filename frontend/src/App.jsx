@@ -1611,8 +1611,6 @@ function ChartPlaceholder({ title, message }) {
 /* ──────────────────── FILTERS PANEL ──────────────────── */
 
 function FiltersPanel({ filters, setFilters, towers, capacityConfig, onRefresh }) {
-  const [futureDays, setFutureDays] = useState(7);
-
   const carriersForTower = useCallback((towerLabel) => {
     if (!towerLabel) return [];
     const t = towers.find((t) => t.tower_label === towerLabel);
@@ -1680,40 +1678,20 @@ function FiltersPanel({ filters, setFilters, towers, capacityConfig, onRefresh }
         </div>
 
         <div className="pt-2 space-y-2">
-          <a href={`${API}/export/summary-demo?${new URLSearchParams({ ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`}
-            className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors" style={{ background: PALETTE.green + "20", color: PALETTE.green, border: `1px solid ${PALETTE.green}40`, textDecoration: "none" }}>
-            <Download size={14} /> Export Data Report (.xlsx)
-          </a>
-
-          <div className="rounded-xl p-2" style={{ background: PALETTE.bg, border: `1px solid ${PALETTE.border}` }}>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] uppercase tracking-wider" style={{ color: PALETTE.textMuted }}>Future Days</span>
-              <span className="font-mono text-xs font-bold" style={{ color: PALETTE.amber }}>{futureDays}d</span>
-            </div>
-            <input type="range" id="future-days-slider" name="future-days-slider" min="1" max="30" value={futureDays}
-              onChange={(e) => setFutureDays(Number(e.target.value))}
-              className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ background: PALETTE.border, accentColor: PALETTE.amber }} />
-          </div>
-          <a href={`${API}/export/predictions-demo?days=${futureDays}`}
-            className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors" style={{ background: PALETTE.amber + "20", color: PALETTE.amber, border: `1px solid ${PALETTE.amber}40`, textDecoration: "none" }}>
-            <Download size={14} /> Future Predictions (.xlsx)
-          </a>
-          <a href={`${API}/export/kpi?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.carrier && { carrier: filters.carrier }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`}
-            className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors" style={{ background: PALETTE.bg, color: PALETTE.textMuted, border: `1px solid ${PALETTE.border}`, textDecoration: "none" }}>
-            <Download size={14} /> Export KPI Data
-          </a>
-          <a href={`${API}/export/decisions?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`}
-            className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors" style={{ background: PALETTE.bg, color: PALETTE.textMuted, border: `1px solid ${PALETTE.border}`, textDecoration: "none" }}>
-            <Download size={14} /> Export Decisions
-          </a>
-          <a href={`${API}/export/power-energy?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`}
-            className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors" style={{ background: PALETTE.bg, color: PALETTE.cyan, border: `1px solid ${PALETTE.border}`, textDecoration: "none" }}>
-            <Battery size={14} /> Export Power / Energy
-          </a>
-          <a href={`${API}/export/thesis-report`}
-            className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors" style={{ background: PALETTE.purple + "20", color: PALETTE.purple, border: `1px solid ${PALETTE.purple}40`, textDecoration: "none" }}>
-            <Download size={14} /> Thesis Report (.xlsx)
-          </a>
+          {[
+            { href: `${API}/export/summary-demo?${new URLSearchParams({ ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export Data Report", color: PALETTE.green },
+            { href: `${API}/export/predictions-demo?days=7`, label: "Export Future Predictions", color: PALETTE.amber },
+            { href: `${API}/export/kpi?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.carrier && { carrier: filters.carrier }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export KPI Data", color: PALETTE.cyan },
+            { href: `${API}/export/decisions?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export Decisions", color: PALETTE.purple },
+            { href: `${API}/export/power-energy?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`, label: "Export Power / Energy", color: PALETTE.pink },
+            { href: `${API}/export/thesis-report`, label: "Export Thesis Report", color: PALETTE.accent },
+          ].map((btn) => (
+            <a key={btn.label} href={btn.href}
+              className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2.5 text-xs font-semibold uppercase tracking-wider transition-colors"
+              style={{ background: btn.color + "15", color: btn.color, border: `1px solid ${btn.color}30`, textDecoration: "none" }}>
+              <Download size={14} /> {btn.label}
+            </a>
+          ))}
         </div>
       </div>
     </div>
@@ -2286,10 +2264,16 @@ export default function App() {
   const [summary, setSummary] = useState(null);
   const [liveStatus, setLiveStatus] = useState(null);
   const [towers, setTowers] = useState([]);
-  const [filters, setFilters] = useState({ tower: "Tower A", carrier: "1_A", dateFrom: "", dateTo: "" });
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const lastMonth = new Date();
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+  const lastMonthStr = lastMonth.toISOString().slice(0, 10);
+
+  const [filters, setFilters] = useState({ tower: "Tower A", carrier: "1_A", dateFrom: lastMonthStr, dateTo: todayStr });
   const [refreshKey, setRefreshKey] = useState(0);
   const [powerSummary, setPowerSummary] = useState(null);
   const [capacityConfig, setCapacityConfig] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const fetchAll = useCallback(async () => {
     const safeFetch = (url) => fetch(url).then((r) => r.json()).catch(() => null);
@@ -2319,9 +2303,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen" style={{ background: PALETTE.bg, color: PALETTE.text }}>
-      <header className="px-6 py-4" style={{ background: PALETTE.surface, borderBottom: `1px solid ${PALETTE.border}` }}>
+      <header className="px-4 sm:px-6 py-4" style={{ background: PALETTE.surface, borderBottom: `1px solid ${PALETTE.border}` }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-xl transition-colors" style={{ background: PALETTE.bg, color: PALETTE.textMuted }}>
+              <SlidersHorizontal size={18} />
+            </button>
             <img src="/favicon.svg" alt="Logo" className="w-10 h-10 rounded-xl" />
             <div>
               <h1 className="text-base font-bold tracking-tight" style={{ color: PALETTE.text }}>Carrier Power System</h1>
@@ -2338,7 +2325,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="px-6 py-6">
+      <main className="px-4 sm:px-6 py-6">
         <div className="flex gap-6">
           <aside className="w-64 shrink-0 hidden lg:block">
             <div className="sticky top-6 space-y-4">
@@ -2358,6 +2345,34 @@ export default function App() {
               </button>
             </div>
           </aside>
+
+          {sidebarOpen && (
+            <div className="fixed inset-0 z-50 lg:hidden">
+              <div className="absolute inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
+              <div className="relative w-72 h-full overflow-y-auto p-4 space-y-4" style={{ background: PALETTE.bg }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold" style={{ color: PALETTE.text }}>Menu</span>
+                  <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-lg" style={{ background: PALETTE.surface, color: PALETTE.textMuted }}>
+                    <ChevronDown size={16} style={{ transform: "rotate(90deg)" }} />
+                  </button>
+                </div>
+                <FiltersPanel
+                  filters={filters} setFilters={setFilters}
+                  towers={towers} capacityConfig={capacityConfig}
+                  onRefresh={() => { setRefreshKey((k) => k + 1); setSidebarOpen(false); }}
+                />
+                <UploadWidget onUploaded={() => { setRefreshKey((k) => k + 1); setSidebarOpen(false); }} />
+                <TestScenarioTool />
+                <ModelStatusPanel onTrained={() => setRefreshKey((k) => k + 1)} />
+                <button onClick={() => { setPage("admin"); setSidebarOpen(false); }}
+                  className="w-full rounded-2xl p-4 flex items-center gap-3 transition-colors"
+                  style={{ background: PALETTE.surface, border: `1px solid ${PALETTE.border}`, color: PALETTE.textMuted }}>
+                  <Lock size={16} style={{ color: PALETTE.amber }} />
+                  <span className="text-sm font-semibold">Admin Panel</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="flex-1 min-w-0 space-y-6">
             <LiveStatusHeader liveStatus={liveStatus} />

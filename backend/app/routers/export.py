@@ -521,16 +521,16 @@ def _build_demo_summary_excel(date_from: date, date_to: date, db: Session) -> By
             if b_c_on: b3_active += 1
 
             data_rows.append({
-                "Days": day_str, "Hour": hour, "Tower": "A1", "Prb": prb_a_1, "RRU Power": p_a, "Status": "ON",
-                "Days.1": day_str, "Hour.1": hour, "TowerB": "B1", "Prb.1": prb_b_1, "RRU Power.1": p_a, "Status.1": "ON"
+                "Days": day_str, "Hour": hour, "TowerA": "A1", "PRB": prb_a_1, "RRU Power": p_a, "Status": "ON",
+                "Days B": day_str, "Hour B": hour, "TowerB": "B1", "PRB B": prb_b_1, "RRU Power B": p_a, "Status B": "ON"
             })
             data_rows.append({
-                "Days": day_str, "Hour": hour, "Tower": "A2", "Prb": prb_a_2, "RRU Power": p_b, "Status": "ON" if a_b_on else "OFF",
-                "Days.1": day_str, "Hour.1": hour, "TowerB": "B2", "Prb.1": prb_b_2, "RRU Power.1": p_b, "Status.1": "ON" if b_b_on else "OFF"
+                "Days": day_str, "Hour": hour, "TowerA": "A2", "PRB": prb_a_2, "RRU Power": p_b, "Status": "ON" if a_b_on else "OFF",
+                "Days B": day_str, "Hour B": hour, "TowerB": "B2", "PRB B": prb_b_2, "RRU Power B": p_b, "Status B": "ON" if b_b_on else "OFF"
             })
             data_rows.append({
-                "Days": day_str, "Hour": hour, "Tower": "A3", "Prb": prb_a_3, "RRU Power": p_c, "Status": "ON" if a_c_on else "OFF",
-                "Days.1": day_str, "Hour.1": hour, "TowerB": "B3", "Prb.1": prb_b_3, "RRU Power.1": p_c, "Status.1": "ON" if b_c_on else "OFF"
+                "Days": day_str, "Hour": hour, "TowerA": "A3", "PRB": prb_a_3, "RRU Power": p_c, "Status": "ON" if a_c_on else "OFF",
+                "Days B": day_str, "Hour B": hour, "TowerB": "B3", "PRB B": prb_b_3, "RRU Power B": p_c, "Status B": "ON" if b_c_on else "OFF"
             })
 
             str_a = "A1 active, A2 and A3 active" if (a_b_on and a_c_on) else ("A1 active, A2 and A3 inactive" if (not a_b_on and not a_c_on) else "A1 active, A2 active, A3 inactive")
