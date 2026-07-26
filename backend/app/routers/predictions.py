@@ -42,7 +42,7 @@ def explain_prediction(
     db: Session = Depends(get_db),
 ):
     """Return the historical dates that contributed to a prediction,
-    plus the capacity-based decision math for the carrier's tower."""
+    plus the threshold-based decision math for the carrier's tower."""
     from app import models
     carrier_obj = db.query(models.Carrier).filter_by(sector_label=carrier).first()
     if not carrier_obj:
@@ -51,10 +51,10 @@ def explain_prediction(
     pred = prediction.predict_prb(carrier_obj.id, target_date, target_hour, db)
     weekday_name = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][target_date.weekday()]
 
-    # Capacity-based decision math for the tower
-    from app.services.power import get_power_config, capacity_decide
+    # Threshold-based decision math for the tower
+    from app.services.power import get_power_config, threshold_decide
     pconfig = get_power_config(db)
-    ceiling = pconfig["capacity_ceiling"]
+    threshold = pconfig.get("carrier_threshold", 70.0)
 
     tower = carrier_obj.tower
     carriers = sorted(tower.carriers, key=lambda c: c.activation_order)
@@ -67,7 +67,7 @@ def explain_prediction(
             "predicted_prb": c_pred["predicted_prb"],
         })
 
-    cap_decision = capacity_decide(carrier_loads, ceiling)
+    th_decision = threshold_decide(carrier_loads, threshold)
 
     return {
         "carrier": carrier,
@@ -82,8 +82,8 @@ def explain_prediction(
         "sample_count": pred["sample_count"],
         "limited_history": pred["limited_history"],
         "contributing_dates": pred["contributing_dates"],
-        "capacity_decision": cap_decision,
-        "capacity_ceiling": ceiling,
+        "capacity_decision": th_decision,
+        "carrier_threshold": threshold,
         "target_band_low": pconfig["target_band_low"],
         "target_band_high": pconfig["target_band_high"],
     }
@@ -362,18 +362,19 @@ def set_capacity_config(body: dict, db: Session = Depends(get_db)):
 
 @router.get("/capacity-preview")
 def capacity_preview(db: Session = Depends(get_db)):
-    """Live preview: with current ceiling, how many carriers would be ON right now
-    for each tower, given the slider's hypothetical ceiling."""
+    """Live preview: with current threshold, how many carriers would be ON right now
+    for each tower, given the threshold logic."""
     from datetime import datetime as dt
+    from app import models
     from app.services.prediction import predict_prb as predict_prb_fn
-    from app.services.power import capacity_decide
+    from app.services.power import threshold_decide
 
     now = dt.now()
     today = now.date()
     current_hour = now.hour
 
     pconfig = power.get_power_config(db)
-    ceiling = pconfig["capacity_ceiling"]
+    threshold = pconfig.get("carrier_threshold", 70.0)
 
     towers = db.query(models.Tower).all()
     preview = {}
@@ -387,7 +388,7 @@ def capacity_preview(db: Session = Depends(get_db)):
                 "activation_order": c.activation_order,
                 "predicted_prb": pred["predicted_prb"],
             })
-        dec = capacity_decide(carrier_loads, ceiling)
+        dec = threshold_decide(carrier_loads, threshold)
         preview[tower.tower_label] = {
             "tower_id": tower.id,
             "total_demand": dec["total_demand"],
@@ -405,15 +406,15 @@ def test_scenario(
     load_a: float = Query(..., description="Hypothetical load for carrier A (%)"),
     load_b: float = Query(..., description="Hypothetical load for carrier B (%)"),
     load_c: float = Query(..., description="Hypothetical load for carrier C (%)"),
-    ceiling: float = Query(None, description="Override ceiling (uses current config if omitted)"),
+    threshold: float = Query(None, description="Override threshold (uses current config if omitted)"),
     db: Session = Depends(get_db),
 ):
     """Test scenario: given 3 hypothetical carrier loads,
-    show how many carriers the configured algorithm would activate."""
-    from app.services.power import capacity_decide, threshold_decide
+    show how many carriers the threshold algorithm would activate."""
+    from app.services.power import threshold_decide
 
     pconfig = power.get_power_config(db)
-    logic = pconfig.get("decision_logic", "threshold_based")
+    effective_threshold = threshold if threshold is not None else pconfig.get("carrier_threshold", 70.0)
 
     carrier_loads = [
         {"sector_label": "A", "activation_order": 0, "predicted_prb": load_a},
@@ -421,33 +422,25 @@ def test_scenario(
         {"sector_label": "C", "activation_order": 2, "predicted_prb": load_c},
     ]
 
-    if logic == "threshold_based":
-        effective_threshold = pconfig.get("carrier_threshold", 70.0)
-        result = threshold_decide(carrier_loads, effective_threshold)
-        result["decision_logic"] = "threshold_based"
-        result["carrier_threshold"] = effective_threshold
-    else:
-        effective_ceiling = ceiling if ceiling is not None else pconfig["capacity_ceiling"]
-        result = capacity_decide(carrier_loads, effective_ceiling)
-        result["decision_logic"] = "capacity_based"
-        result["capacity_ceiling"] = effective_ceiling
-
+    result = threshold_decide(carrier_loads, effective_threshold)
+    result["decision_logic"] = "threshold_based"
+    result["carrier_threshold"] = effective_threshold
     result["loads"] = {"A": load_a, "B": load_b, "C": load_c}
     return result
 
 
 @router.get("/threshold")
 def get_threshold(db: Session = Depends(get_db)):
-    """Legacy endpoint - returns capacity_ceiling for backward compat."""
+    """Returns current carrier threshold config."""
     pconfig = power.get_power_config(db)
-    return {"threshold": pconfig["capacity_ceiling"]}
+    return {"threshold": pconfig.get("carrier_threshold", 70.0)}
 
 
 @router.post("/threshold")
 def set_threshold(body: dict, db: Session = Depends(get_db)):
-    """Legacy endpoint - sets capacity_ceiling for backward compat."""
-    value = float(body.get("threshold", 80.0))
-    power.set_power_config(db, {"capacity_ceiling": value})
+    """Sets carrier threshold."""
+    value = float(body.get("threshold", 70.0))
+    power.set_power_config(db, {"carrier_threshold": value})
     db.commit()
     return {"threshold": value}
 

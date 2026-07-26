@@ -2,14 +2,14 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { domToPng } from "modern-screenshot";
 import {
   Zap, ZapOff, Download, Upload, RefreshCw, SlidersHorizontal,
-  ChevronDown, ChevronUp, Radio, TowerControl, Clock, Database,
+  ChevronDown, ChevronUp, TowerControl, Clock, Database,
   Power, PowerOff, Settings, Search, Battery, Lightbulb, Info,
   FlaskConical, Lock, ArrowLeft, Shield, Calendar, Camera
 } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ReferenceLine, ReferenceArea
+  ReferenceArea
 } from "recharts";
 
 const API = import.meta.env.VITE_API_URL || "/api";
@@ -442,7 +442,7 @@ function LiveStatusHeader({ liveStatus }) {
           </div>
           <div className="mt-3 flex items-center justify-between text-xs" style={{ color: PALETTE.textMuted }}>
             <span>Total demand: <span className="font-mono font-bold" style={{ color: PALETTE.text }}>{tower.total_demand?.toFixed(1)}%</span></span>
-            <span>Ceiling: <span className="font-mono font-bold" style={{ color: PALETTE.amber }}>{tower.capacity_ceiling}%</span></span>
+            <span>Threshold: <span className="font-mono font-bold" style={{ color: PALETTE.amber }}>{tower.carrier_threshold ?? 70}%</span></span>
             <span>Power: <span className="font-mono font-bold" style={{ color: PALETTE.cyan }}>{tower.tower_power_watts?.toFixed(0)}W</span></span>
           </div>
         </div>
@@ -1021,7 +1021,7 @@ function ExplainabilityPanel({ carrier, towers }) {
                 </div>
               </div>
 
-              {/* Capacity decision math */}
+              {/* Threshold decision logic */}
               {data.capacity_decision && (
                 <div className="rounded-xl p-4" style={{ background: PALETTE.bg, border: `1px solid ${PALETTE.border}` }}>
                   <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: PALETTE.cyan }}>Decision Logic</h4>
@@ -1031,16 +1031,16 @@ function ExplainabilityPanel({ carrier, towers }) {
                       <div className="font-mono text-sm font-bold" style={{ color: PALETTE.text }}>{data.capacity_decision.total_demand?.toFixed(1)}%</div>
                     </div>
                     <div>
-                      <div className="text-xs" style={{ color: PALETTE.textMuted }}>Ceiling Used</div>
-                      <div className="font-mono text-sm font-bold" style={{ color: PALETTE.amber }}>{data.capacity_decision.capacity_ceiling}%</div>
+                      <div className="text-xs" style={{ color: PALETTE.textMuted }}>Threshold Used</div>
+                      <div className="font-mono text-sm font-bold" style={{ color: PALETTE.amber }}>{data.carrier_threshold ?? 70}%</div>
                     </div>
                     <div>
                       <div className="text-xs" style={{ color: PALETTE.textMuted }}>Active / Max</div>
                       <div className="font-mono text-sm font-bold" style={{ color: PALETTE.green }}>{data.capacity_decision.active_count} / {data.capacity_decision.max_carriers}</div>
                     </div>
                     <div>
-                      <div className="text-xs" style={{ color: PALETTE.textMuted }}>Per-Carrier Load</div>
-                      <div className="font-mono text-sm font-bold" style={{ color: PALETTE.text }}>{data.capacity_decision.per_carrier_load?.toFixed(1)}%</div>
+                      <div className="text-xs" style={{ color: PALETTE.textMuted }}>Mode</div>
+                      <div className="font-mono text-sm font-bold" style={{ color: PALETTE.text }}>{data.capacity_decision.mode}</div>
                     </div>
                   </div>
                   <div className="space-y-1.5">
@@ -1053,7 +1053,7 @@ function ExplainabilityPanel({ carrier, towers }) {
                     ))}
                   </div>
                   <p className="text-xs mt-2" style={{ color: PALETTE.textMuted }}>
-                    Total demand {data.capacity_decision.total_demand?.toFixed(1)}% / {data.capacity_decision.active_count} active = {data.capacity_decision.per_carrier_load?.toFixed(1)}% per carrier {data.capacity_decision.per_carrier_load <= data.capacity_decision.capacity_ceiling ? "≤" : ">"} {data.capacity_decision.capacity_ceiling}% ceiling → {data.capacity_decision.active_count} carrier{data.capacity_decision.active_count > 1 ? "s" : ""} ON
+                    Any carrier &gt; {data.carrier_threshold ?? 70}% → all carriers ON. Otherwise only Carrier A ON.
                   </p>
                 </div>
               )}
@@ -1386,7 +1386,7 @@ function TestScenarioTool() {
 
   const runTest = useCallback(() => {
     setLoading(true);
-    const params = `load_a=${loads.a}&load_b=${loads.b}&load_c=${loads.c}&ceiling=80`;
+    const params = `load_a=${loads.a}&load_b=${loads.b}&load_c=${loads.c}&threshold=${threshold}`;
     fetch(`${API}/test-scenario?${params}`)
       .then((r) => r.json())
       .then(setResult)
@@ -2280,20 +2280,19 @@ export default function App() {
   const [capacityConfig, setCapacityConfig] = useState(null);
 
   const fetchAll = useCallback(async () => {
-    try {
-      const [sumRes, liveRes, towersRes, powRes, cfgRes] = await Promise.all([
-        fetch(`${API}/data/summary`),
-        fetch(`${API}/live-status`),
-        fetch(`${API}/data/towers`),
-        fetch(`${API}/data/power-summary?days=7`),
-        fetch(`${API}/capacity-config`),
-      ]);
-      setSummary(await sumRes.json());
-      setLiveStatus(await liveRes.json());
-      setTowers(await towersRes.json());
-      setPowerSummary(await powRes.json());
-      setCapacityConfig(await cfgRes.json());
-    } catch (e) { console.error(e); }
+    const safeFetch = (url) => fetch(url).then((r) => r.json()).catch(() => null);
+    const [sumData, liveData, towersData, powData, cfgData] = await Promise.all([
+      safeFetch(`${API}/data/summary`),
+      safeFetch(`${API}/live-status`),
+      safeFetch(`${API}/data/towers`),
+      safeFetch(`${API}/data/power-summary?days=7`),
+      safeFetch(`${API}/capacity-config`),
+    ]);
+    if (sumData) setSummary(sumData);
+    if (liveData) setLiveStatus(liveData);
+    if (towersData) setTowers(towersData);
+    if (powData) setPowerSummary(powData);
+    if (cfgData) setCapacityConfig(cfgData);
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll, refreshKey]);

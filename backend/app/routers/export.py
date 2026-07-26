@@ -334,7 +334,7 @@ def export_thesis_report(db: Session = Depends(get_db)):
 
     # Sheet 4: Capacity Config
     cap_rows = [
-        {"Parameter": "Capacity Ceiling", "Value": pconfig["capacity_ceiling"], "Unit": "%"},
+        {"Parameter": "Carrier Threshold", "Value": pconfig["carrier_threshold"], "Unit": "%"},
         {"Parameter": "Target Band Low", "Value": pconfig["target_band_low"], "Unit": "%"},
         {"Parameter": "Target Band High", "Value": pconfig["target_band_high"], "Unit": "%"},
     ]

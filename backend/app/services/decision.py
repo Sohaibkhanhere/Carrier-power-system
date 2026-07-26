@@ -1,8 +1,7 @@
-"""Decision engine — capacity-based or threshold-based carrier management.
+"""Decision engine — threshold-based carrier management.
 
-Selects between two algorithms based on the 'decision_logic' config field:
-  - "capacity_based": activate minimum carriers so total_demand/n <= ceiling
-  - "threshold_based": if ANY carrier exceeds the threshold, activate all carriers
+If ANY carrier exceeds the threshold, activate ALL carriers.
+Otherwise only the primary carrier (activation_order=0) stays on.
 """
 
 from __future__ import annotations
@@ -13,15 +12,13 @@ from sqlalchemy.orm import Session
 from app import models
 from app.services.prediction import predict_prb
 from app.services.power import (
-    get_power_config, compute_tower_power, capacity_decide, threshold_decide,
+    get_power_config, compute_tower_power, threshold_decide,
 )
 
 
 def make_decisions_for_hour(target_date: date, hour: int, db: Session) -> list[dict]:
-    """Evaluate all towers for a given date+hour using the configured decision logic."""
+    """Evaluate all towers for a given date+hour using threshold-based decision logic."""
     pconfig = get_power_config(db)
-    ceiling = pconfig["capacity_ceiling"]
-    logic = pconfig.get("decision_logic", "threshold_based")
     threshold = pconfig.get("carrier_threshold", 70.0)
     towers = db.query(models.Tower).all()
     results = []
@@ -30,7 +27,6 @@ def make_decisions_for_hour(target_date: date, hour: int, db: Session) -> list[d
         # Get carriers sorted by activation_order
         carriers = sorted(tower.carriers, key=lambda c: c.activation_order)
 
-        # Build carrier load list for the capacity algorithm
         carrier_loads = []
         for carrier in carriers:
             pred = predict_prb(carrier.id, target_date, hour, db)
@@ -40,21 +36,17 @@ def make_decisions_for_hour(target_date: date, hour: int, db: Session) -> list[d
                 "predicted_prb": pred["predicted_prb"],
             })
 
-        # Always use Threshold-Based Decision Logic
         decision_result = threshold_decide(carrier_loads, threshold)
 
-        # Map carrier states back to B/C format for the decisions table
         carrier_states = {c["sector_label"]: c["is_on"] for c in decision_result["carriers"]}
 
-        # Find B and C states (2nd and 3rd carriers by activation_order)
         sorted_sectors = [c.sector_label for c in sorted(carriers, key=lambda c: c.activation_order)]
         b_state = "ON" if len(sorted_sectors) > 1 and carrier_states.get(sorted_sectors[1], False) else "OFF"
         c_state = "ON" if len(sorted_sectors) > 2 and carrier_states.get(sorted_sectors[2], False) else "OFF"
 
-        # Compute tower power
         prb_map = {c["sector_label"]: c["predicted_prb"] or 0 for c in carrier_loads}
         tower_power = compute_tower_power(
-            True,  # A is always on
+            True,
             b_state == "ON",
             c_state == "ON",
             prb_map.get(sorted_sectors[0], 0),
@@ -63,7 +55,6 @@ def make_decisions_for_hour(target_date: date, hour: int, db: Session) -> list[d
             pconfig,
         )
 
-        # Average predicted PRB across all carriers for logging
         avg_prb = decision_result["per_carrier_load"]
 
         existing = (
@@ -81,7 +72,7 @@ def make_decisions_for_hour(target_date: date, hour: int, db: Session) -> list[d
             "predicted_prb_used": round(avg_prb, 2),
             "power_watts": tower_power,
             "total_demand": decision_result["total_demand"],
-            "capacity_ceiling_used": ceiling,
+            "capacity_ceiling_used": threshold,
             "active_count": decision_result["active_count"],
         }
 
@@ -96,7 +87,7 @@ def make_decisions_for_hour(target_date: date, hour: int, db: Session) -> list[d
             "tower_id": tower.id,
             "mode": decision_result["mode"],
             "total_demand": decision_result["total_demand"],
-            "capacity_ceiling": ceiling,
+            "carrier_threshold": threshold,
             "active_count": decision_result["active_count"],
             "per_carrier_load": decision_result["per_carrier_load"],
             "power_watts": tower_power,
