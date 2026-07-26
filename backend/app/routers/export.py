@@ -606,7 +606,7 @@ def export_summary_demo(
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=demo_summary_export_{date_from}_{date_to}.xlsx"},
+        headers={"Content-Disposition": f"attachment; filename=Data_Report_{date_from}_to_{date_to}.xlsx"},
     )
 
 
