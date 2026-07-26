@@ -141,7 +141,16 @@ def export_explainability(
     """Export the explainability breakdown for a prediction as .xlsx."""
     carrier_obj = db.query(models.Carrier).filter_by(sector_label=carrier).first()
     if not carrier_obj:
-        return {"error": "Carrier not found"}
+        df = pd.DataFrame([{"Error": f"Carrier '{carrier}' not found"}])
+        buf = BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Error")
+        buf.seek(0)
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=explainability_error.xlsx"},
+        )
 
     pred = predict_prb(carrier_obj.id, target_date, target_hour, db)
     contributing = pred.get("contributing_dates", [])
@@ -211,13 +220,13 @@ def export_power_energy(
     rows = q.order_by(models.Tower.tower_label, models.Decision.date, models.Decision.hour).all()
 
     # Compute per-row power
-    all_on_power = compute_tower_power(True, True, True, 50, 50, 50, pconfig)
+    all_on_power = compute_tower_power(True, True, True, 0, 0, 0, pconfig)
     records = []
     for r in rows:
         cb_on = r.carrier_b_state == "ON"
         cc_on = r.carrier_c_state == "ON"
-        prb_b = r.predicted_prb_used or 50
-        actual_power = compute_tower_power(True, cb_on, cc_on, 50, prb_b, prb_b, pconfig)
+        prb_used = r.predicted_prb_used or 0
+        actual_power = compute_tower_power(True, cb_on, cc_on, prb_used, prb_used, prb_used, pconfig)
         saved = all_on_power - actual_power
         records.append({
             "Tower": r.tower_label,
@@ -272,7 +281,7 @@ def export_thesis_report(db: Session = Depends(get_db)):
     1. Site Overview — site/carrier structure
     2. Data Summary — date range, row counts, source breakdown
     3. Power Model — current config, watts per carrier
-    4. Capacity Config — ceiling, bands
+    4. Decision Config — threshold, bands
     5. Decision Statistics — mode distribution, energy savings
     6. Model Accuracy — training runs with MAE/RMSE
     7. Daily Energy — day-by-day actual vs baseline kWh
@@ -332,7 +341,7 @@ def export_thesis_report(db: Session = Depends(get_db)):
     ]
     df_power = pd.DataFrame(power_rows)
 
-    # Sheet 4: Capacity Config
+    # Sheet 4: Decision Config
     cap_rows = [
         {"Parameter": "Carrier Threshold", "Value": pconfig["carrier_threshold"], "Unit": "%"},
         {"Parameter": "Target Band Low", "Value": pconfig["target_band_low"], "Unit": "%"},
@@ -377,7 +386,6 @@ def export_thesis_report(db: Session = Depends(get_db)):
     df_runs = pd.DataFrame(run_rows) if run_rows else pd.DataFrame(columns=["Run ID", "Trained At", "Model Type", "Training Rows", "MAE (%)", "RMSE (%)", "Notes"])
 
     # Sheet 7: Daily Energy Summary
-    from datetime import timedelta
     daily = {}
     for d in decisions:
         day_str = str(d.date)
@@ -405,7 +413,7 @@ def export_thesis_report(db: Session = Depends(get_db)):
         df_site.to_excel(writer, index=False, sheet_name="Site Overview")
         df_summary.to_excel(writer, index=False, sheet_name="Data Summary")
         df_power.to_excel(writer, index=False, sheet_name="Power Model")
-        df_cap.to_excel(writer, index=False, sheet_name="Capacity Config")
+        df_cap.to_excel(writer, index=False, sheet_name="Decision Config")
         df_stats.to_excel(writer, index=False, sheet_name="Decision Statistics")
         df_runs.to_excel(writer, index=False, sheet_name="Model Accuracy")
         if not df_energy.empty:
@@ -424,13 +432,13 @@ def _build_demo_summary_excel(date_from: date, date_to: date, db: Session) -> By
     from app.services.power import get_power_config
 
     pconfig = get_power_config(db)
-    p_a = pconfig.get("carrier_a_watts", 300.0)
-    p_b = pconfig.get("carrier_b_watts", 200.0)
-    p_c = pconfig.get("carrier_c_watts", 100.0)
+    p_a = pconfig.get("carrier_a_watts", 2400.0)
+    p_b = pconfig.get("carrier_b_watts", 900.0)
+    p_c = pconfig.get("carrier_c_watts", 900.0)
 
     towers = db.query(models.Tower).all()
-    tower_a = next((t for t in towers if "A" in t.tower_label.upper()), towers[0] if towers else None)
-    tower_b = next((t for t in towers if "B" in t.tower_label.upper()), towers[1] if len(towers) > 1 else tower_a)
+    tower_a = towers[0] if towers else None
+    tower_b = towers[1] if len(towers) > 1 else None
 
     carriers = db.query(models.Carrier).all()
     carrier_map = {}
@@ -486,29 +494,29 @@ def _build_demo_summary_excel(date_from: date, date_to: date, db: Session) -> By
 
             day_str = str(curr)
 
-            d_a = dec_by_key.get((curr, hour, tower_a.id) if tower_a else None)
-            d_b = dec_by_key.get((curr, hour, tower_b.id) if tower_b else None)
+            d_a = dec_by_key.get((curr, hour, tower_a.id)) if tower_a else None
+            d_b = dec_by_key.get((curr, hour, tower_b.id)) if tower_b else None
 
             a_b_on = d_a.carrier_b_state == "ON" if d_a else True
             a_c_on = d_a.carrier_c_state == "ON" if d_a else True
             b_b_on = d_b.carrier_b_state == "ON" if d_b else True
             b_c_on = d_b.carrier_c_state == "ON" if d_b else True
 
-            prb_a_1 = round(_get_pred_prb(tower_a.id, "A", curr, hour) if tower_a else 50.0, 1)
-            prb_a_2 = round(_get_pred_prb(tower_a.id, "B", curr, hour) if tower_a else 50.0, 1)
-            prb_a_3 = round(_get_pred_prb(tower_a.id, "C", curr, hour) if tower_a else 50.0, 1)
+            prb_a_1 = round(_get_pred_prb(tower_a.id, "A", curr, hour) if tower_a else 0.0, 1)
+            prb_a_2 = round(_get_pred_prb(tower_a.id, "B", curr, hour) if tower_a else 0.0, 1)
+            prb_a_3 = round(_get_pred_prb(tower_a.id, "C", curr, hour) if tower_a else 0.0, 1)
 
-            prb_b_1 = round(_get_pred_prb(tower_b.id, "A", curr, hour) if tower_b else 50.0, 1)
-            prb_b_2 = round(_get_pred_prb(tower_b.id, "B", curr, hour) if tower_b else 50.0, 1)
-            prb_b_3 = round(_get_pred_prb(tower_b.id, "C", curr, hour) if tower_b else 50.0, 1)
+            prb_b_1 = round(_get_pred_prb(tower_b.id, "A", curr, hour) if tower_b else 0.0, 1)
+            prb_b_2 = round(_get_pred_prb(tower_b.id, "B", curr, hour) if tower_b else 0.0, 1)
+            prb_b_3 = round(_get_pred_prb(tower_b.id, "C", curr, hour) if tower_b else 0.0, 1)
 
-            pow_a_act = p_a + (p_b if a_b_on else 0) + (p_c if a_c_on else 0)
-            pow_a_base = p_a + p_b + p_c
+            pow_a_act = p_a + (p_b if a_b_on else 0) + (p_c if a_c_on else 0) if tower_a else 0
+            pow_a_base = p_a + p_b + p_c if tower_a else 0
             t_a_energy_actual += pow_a_act
             t_a_energy_baseline += pow_a_base
 
-            pow_b_act = p_a + (p_b if b_b_on else 0) + (p_c if b_c_on else 0)
-            pow_b_base = p_a + p_b + p_c
+            pow_b_act = p_a + (p_b if b_b_on else 0) + (p_c if b_c_on else 0) if tower_b else 0
+            pow_b_base = p_a + p_b + p_c if tower_b else 0
             t_b_energy_actual += pow_b_act
             t_b_energy_baseline += pow_b_base
 
@@ -533,8 +541,8 @@ def _build_demo_summary_excel(date_from: date, date_to: date, db: Session) -> By
                 "Days B": day_str, "Hour B": hour, "TowerB": "B3", "PRB B": prb_b_3, "RRU Power B": p_c, "Status B": "ON" if b_c_on else "OFF"
             })
 
-            str_a = "A1 active, A2 and A3 active" if (a_b_on and a_c_on) else ("A1 active, A2 and A3 inactive" if (not a_b_on and not a_c_on) else "A1 active, A2 active, A3 inactive")
-            str_b = "B1 active, B2 and B3 active" if (b_b_on and b_c_on) else ("B1 active, B2 and B3 inactive" if (not b_b_on and not b_c_on) else "B1 active, B2 active, B3 inactive")
+            str_a = "A1 active, A2 and A3 active" if (a_b_on and a_c_on) else ("A1 active, A2 and A3 inactive" if (not a_b_on and not a_c_on) else ("A1 active, A2 active, A3 inactive" if a_b_on else "A1 active, A2 inactive, A3 active"))
+            str_b = "B1 active, B2 and B3 active" if (b_b_on and b_c_on) else ("B1 active, B2 and B3 inactive" if (not b_b_on and not b_c_on) else ("B1 active, B2 active, B3 inactive" if b_b_on else "B1 active, B2 inactive, B3 active"))
             log_rows.append({
                 "Days": day_str, "Hour": hour, "Tower A": str_a, "Tower B": str_b
             })
@@ -655,7 +663,6 @@ def export_predictions_demo(
                     .first()
                 )
 
-                a_on = True
                 b_on = dec.carrier_b_state == "ON" if dec else True
                 c_on = dec.carrier_c_state == "ON" if dec else True
                 on_map = {0: True, 1: b_on, 2: c_on}
@@ -682,7 +689,7 @@ def export_predictions_demo(
                         "Carrier": carrier.sector_label,
                         "Predicted PRB (%)": round(carrier_prbs[i], 1),
                         "Decision": "ON" if is_on else "OFF",
-                        "Power (W)": round(tower_power, 1) if is_on else 0,
+                        "Tower Power (W)": round(tower_power, 1),
                         "Mode": dec.mode if dec else "—",
                     })
         curr += timedelta(days=1)
