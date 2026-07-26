@@ -618,8 +618,19 @@ def export_predictions_demo(
 ):
     """Export future predicted data and decisions in demo of summary.xlsx format."""
     from datetime import datetime as dt, timedelta
+    from app.services import decision as decision_svc
+
     start_date = date_from or (dt.now().date() + timedelta(days=1))
     end_date = start_date + timedelta(days=days - 1)
+
+    existing = (
+        db.query(models.Decision)
+        .filter(models.Decision.date >= start_date, models.Decision.date <= end_date)
+        .count()
+    )
+    if existing == 0:
+        count = decision_svc.make_decisions_for_range(start_date, end_date, db)
+        db.commit()
 
     buf = _build_demo_summary_excel(start_date, end_date, db)
     return StreamingResponse(
