@@ -1611,6 +1611,8 @@ function ChartPlaceholder({ title, message }) {
 /* ──────────────────── FILTERS PANEL ──────────────────── */
 
 function FiltersPanel({ filters, setFilters, towers, capacityConfig, onRefresh }) {
+  const [futureDays, setFutureDays] = useState(7);
+
   const carriersForTower = useCallback((towerLabel) => {
     if (!towerLabel) return [];
     const t = towers.find((t) => t.tower_label === towerLabel);
@@ -1680,11 +1682,21 @@ function FiltersPanel({ filters, setFilters, towers, capacityConfig, onRefresh }
         <div className="pt-2 space-y-2">
           <a href={`${API}/export/summary-demo?${new URLSearchParams({ ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`}
             className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors" style={{ background: PALETTE.green + "20", color: PALETTE.green, border: `1px solid ${PALETTE.green}40`, textDecoration: "none" }}>
-            <Download size={14} /> Demo Summary Excel (.xlsx)
+            <Download size={14} /> Export Data Report (.xlsx)
           </a>
-          <a href={`${API}/export/predictions-demo?${new URLSearchParams({ ...(filters.dateFrom && { date_from: filters.dateFrom }), days: "7" })}`}
+
+          <div className="rounded-xl p-2" style={{ background: PALETTE.bg, border: `1px solid ${PALETTE.border}` }}>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] uppercase tracking-wider" style={{ color: PALETTE.textMuted }}>Future Days</span>
+              <span className="font-mono text-xs font-bold" style={{ color: PALETTE.amber }}>{futureDays}d</span>
+            </div>
+            <input type="range" id="future-days-slider" name="future-days-slider" min="1" max="30" value={futureDays}
+              onChange={(e) => setFutureDays(Number(e.target.value))}
+              className="w-full h-1.5 rounded-full appearance-none cursor-pointer" style={{ background: PALETTE.border, accentColor: PALETTE.amber }} />
+          </div>
+          <a href={`${API}/export/predictions-demo?days=${futureDays}`}
             className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors" style={{ background: PALETTE.amber + "20", color: PALETTE.amber, border: `1px solid ${PALETTE.amber}40`, textDecoration: "none" }}>
-            <Download size={14} /> Export Future Predictions (.xlsx)
+            <Download size={14} /> Future Predictions (.xlsx)
           </a>
           <a href={`${API}/export/kpi?${new URLSearchParams({ ...(filters.tower && { tower: filters.tower }), ...(filters.carrier && { carrier: filters.carrier }), ...(filters.dateFrom && { date_from: filters.dateFrom }), ...(filters.dateTo && { date_to: filters.dateTo }) })}`}
             className="flex items-center justify-center gap-1.5 w-full rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors" style={{ background: PALETTE.bg, color: PALETTE.textMuted, border: `1px solid ${PALETTE.border}`, textDecoration: "none" }}>

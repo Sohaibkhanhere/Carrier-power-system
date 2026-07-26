@@ -521,20 +521,20 @@ def _build_demo_summary_excel(date_from: date, date_to: date, db: Session) -> By
             if b_c_on: b3_active += 1
 
             data_rows.append({
-                "Days": day_str, "Hour": hour, "TowerA": "A1", "Prb": prb_a_1, "RRU Power": p_a, "Stutus": "ON",
-                "Days.1": day_str, "Hour.1": hour, "TowerA.1": "B1", "Prb.1": prb_b_1, "RRU Power.1": p_a, "Stutus.1": "ON"
+                "Days": day_str, "Hour": hour, "Tower": "A1", "Prb": prb_a_1, "RRU Power": p_a, "Status": "ON",
+                "Days.1": day_str, "Hour.1": hour, "TowerB": "B1", "Prb.1": prb_b_1, "RRU Power.1": p_a, "Status.1": "ON"
             })
             data_rows.append({
-                "Days": day_str, "Hour": hour, "TowerA": "A2", "Prb": prb_a_2, "RRU Power": p_b, "Stutus": "ON" if a_b_on else "OFF",
-                "Days.1": day_str, "Hour.1": hour, "TowerA.1": "B2", "Prb.1": prb_b_2, "RRU Power.1": p_b, "Stutus.1": "ON" if b_b_on else "OFF"
+                "Days": day_str, "Hour": hour, "Tower": "A2", "Prb": prb_a_2, "RRU Power": p_b, "Status": "ON" if a_b_on else "OFF",
+                "Days.1": day_str, "Hour.1": hour, "TowerB": "B2", "Prb.1": prb_b_2, "RRU Power.1": p_b, "Status.1": "ON" if b_b_on else "OFF"
             })
             data_rows.append({
-                "Days": day_str, "Hour": hour, "TowerA": "A3", "Prb": prb_a_3, "RRU Power": p_c, "Stutus": "ON" if a_c_on else "OFF",
-                "Days.1": day_str, "Hour.1": hour, "TowerA.1": "B3", "Prb.1": prb_b_3, "RRU Power.1": p_c, "Stutus.1": "ON" if b_c_on else "OFF"
+                "Days": day_str, "Hour": hour, "Tower": "A3", "Prb": prb_a_3, "RRU Power": p_c, "Status": "ON" if a_c_on else "OFF",
+                "Days.1": day_str, "Hour.1": hour, "TowerB": "B3", "Prb.1": prb_b_3, "RRU Power.1": p_c, "Status.1": "ON" if b_c_on else "OFF"
             })
 
-            str_a = "A1 active, A2and A3 active" if (a_b_on and a_c_on) else ("A1 active, A2and A3 inactive" if (not a_b_on and not a_c_on) else "A1 active, A2 active, A3 inactive")
-            str_b = "B1 active, B2and B3 active" if (b_b_on and b_c_on) else ("B1 active, B2and B3 inactive" if (not b_b_on and not b_c_on) else "B1 active, B2 active, B3 inactive")
+            str_a = "A1 active, A2 and A3 active" if (a_b_on and a_c_on) else ("A1 active, A2 and A3 inactive" if (not a_b_on and not a_c_on) else "A1 active, A2 active, A3 inactive")
+            str_b = "B1 active, B2 and B3 active" if (b_b_on and b_c_on) else ("B1 active, B2 and B3 inactive" if (not b_b_on and not b_c_on) else "B1 active, B2 active, B3 inactive")
             log_rows.append({
                 "Days": day_str, "Hour": hour, "Tower A": str_a, "Tower B": str_b
             })
@@ -569,12 +569,12 @@ def _build_demo_summary_excel(date_from: date, date_to: date, db: Session) -> By
         {"Metric A": None, "Value": None, "Unnamed: 2": None, "Metric B": None, "Value.1": None},
         {"Metric A": None, "Value": None, "Unnamed: 2": None, "Metric B": None, "Value.1": None},
         {"Metric A": None, "Value": None, "Unnamed: 2": None, "Metric B": None, "Value.1": None},
-        {"Metric A": "Metric(Towe A,Towe B)", "Value": "Value", "Unnamed: 2": None, "Metric B": None, "Value.1": None},
+        {"Metric A": "Metric(Tower A, Tower B)", "Value": "Value", "Unnamed: 2": None, "Metric B": None, "Value.1": None},
         {"Metric A": "Total Energy Consumption (W)", "Value": round(tot_energy_act, 2), "Unnamed: 2": None, "Metric B": None, "Value.1": None},
         {"Metric A": "Total Energy Saved (W)", "Value": round(tot_saved, 2), "Unnamed: 2": None, "Metric B": None, "Value.1": None},
         {"Metric A": "Percentage Saved (%)", "Value": round(tot_pct, 2), "Unnamed: 2": None, "Metric B": None, "Value.1": None},
         {"Metric A": "Active Hours", "Value": comb_active_hours, "Unnamed: 2": None, "Metric B": None, "Value.1": None},
-        {"Metric A": "Inctive Hours", "Value": comb_inactive_hours, "Unnamed: 2": None, "Metric B": None, "Value.1": None},
+        {"Metric A": "Inactive Hours", "Value": comb_inactive_hours, "Unnamed: 2": None, "Metric B": None, "Value.1": None},
     ]
 
     df_summary = pd.DataFrame(summary_data)
@@ -612,15 +612,14 @@ def export_summary_demo(
 
 @router.get("/predictions-demo")
 def export_predictions_demo(
-    date_from: date = Query(None),
     days: int = Query(7, ge=1, le=30),
     db: Session = Depends(get_db),
 ):
-    """Export future predicted data and decisions in demo of summary.xlsx format."""
+    """Export future predictions in a clean format — Date, Hour, Tower, Carrier, Predicted PRB, Decision, Power."""
     from datetime import datetime as dt, timedelta
     from app.services import decision as decision_svc
 
-    start_date = date_from or (dt.now().date() + timedelta(days=1))
+    start_date = dt.now().date() + timedelta(days=1)
     end_date = start_date + timedelta(days=days - 1)
 
     existing = (
@@ -632,10 +631,72 @@ def export_predictions_demo(
         count = decision_svc.make_decisions_for_range(start_date, end_date, db)
         db.commit()
 
-    buf = _build_demo_summary_excel(start_date, end_date, db)
+    from app.services.prediction import predict_prb
+    from app.services.power import get_power_config, compute_tower_power
+
+    pconfig = get_power_config(db)
+    towers = db.query(models.Tower).all()
+    carriers = db.query(models.Carrier).all()
+
+    tower_map = {t.id: t.tower_label for t in towers}
+    carrier_by_tower = {}
+    for c in carriers:
+        carrier_by_tower.setdefault(c.tower_id, []).append(c)
+
+    rows = []
+    curr = start_date
+    while curr <= end_date:
+        for hour in range(24):
+            for tower in towers:
+                t_carriers = sorted(carrier_by_tower.get(tower.id, []), key=lambda c: c.activation_order)
+                dec = (
+                    db.query(models.Decision)
+                    .filter_by(tower_id=tower.id, date=curr, hour=hour)
+                    .first()
+                )
+
+                a_on = True
+                b_on = dec.carrier_b_state == "ON" if dec else True
+                c_on = dec.carrier_c_state == "ON" if dec else True
+                on_map = {0: True, 1: b_on, 2: c_on}
+
+                carrier_prbs = []
+                for carrier in t_carriers:
+                    pred = predict_prb(carrier.id, curr, hour, db)
+                    carrier_prbs.append(pred["predicted_prb"] or 0)
+
+                tower_power = compute_tower_power(
+                    True, b_on, c_on,
+                    carrier_prbs[0] if len(carrier_prbs) > 0 else 0,
+                    carrier_prbs[1] if len(carrier_prbs) > 1 else 0,
+                    carrier_prbs[2] if len(carrier_prbs) > 2 else 0,
+                    pconfig,
+                )
+
+                for i, carrier in enumerate(t_carriers):
+                    is_on = on_map.get(carrier.activation_order, False)
+                    rows.append({
+                        "Date": str(curr),
+                        "Hour": hour,
+                        "Tower": tower.tower_label,
+                        "Carrier": carrier.sector_label,
+                        "Predicted PRB (%)": round(carrier_prbs[i], 1),
+                        "Decision": "ON" if is_on else "OFF",
+                        "Power (W)": round(tower_power, 1) if is_on else 0,
+                        "Mode": dec.mode if dec else "—",
+                    })
+        curr += timedelta(days=1)
+
+    df = pd.DataFrame(rows)
+
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Future Predictions")
+
+    buf.seek(0)
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=future_predictions_summary_{start_date}_{end_date}.xlsx"},
+        headers={"Content-Disposition": f"attachment; filename=Future_Predictions_{start_date}_to_{end_date}.xlsx"},
     )
 
