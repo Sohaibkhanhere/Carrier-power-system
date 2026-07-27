@@ -16,9 +16,9 @@ from app import models
 
 
 DEFAULTS = {
-    "carrier_a_watts": 2400.0,
-    "carrier_b_watts": 900.0,
-    "carrier_c_watts": 900.0,
+    "carrier_a_watts": 600.0,
+    "carrier_b_watts": 400.0,
+    "carrier_c_watts": 200.0,
     "load_scaling_factor": 0.15,
     "capacity_ceiling": 80.0,
     "target_band_low": 70.0,
