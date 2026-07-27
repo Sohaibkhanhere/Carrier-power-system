@@ -2273,11 +2273,11 @@ export default function App() {
   const [liveStatus, setLiveStatus] = useState(null);
   const [towers, setTowers] = useState([]);
   const todayStr = new Date().toISOString().slice(0, 10);
-  const lastMonth = new Date();
-  lastMonth.setMonth(lastMonth.getMonth() - 1);
-  const lastMonthStr = lastMonth.toISOString().slice(0, 10);
+  const lastWeek = new Date();
+  lastWeek.setDate(lastWeek.getDate() - 7);
+  const lastWeekStr = lastWeek.toISOString().slice(0, 10);
 
-  const [filters, setFilters] = useState({ tower: "Tower A", carrier: "1_A", dateFrom: lastMonthStr, dateTo: todayStr });
+  const [filters, setFilters] = useState({ tower: "Tower A", carrier: "1_A", dateFrom: lastWeekStr, dateTo: todayStr });
   const [refreshKey, setRefreshKey] = useState(0);
   const [powerSummary, setPowerSummary] = useState(null);
   const [capacityConfig, setCapacityConfig] = useState(null);
